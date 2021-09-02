@@ -10,7 +10,6 @@ import com.vaadin.ui.VerticalLayout;
 import life.qbic.openbis.openbisclient.OpenBisClient;
 import life.qbic.portal.utils.ConfigurationManager;
 import life.qbic.portal.utils.ConfigurationManagerFactory;
-import life.qbic.portal.utils.LiferayIndependentConfigurationManager;
 import life.qbic.portal.utils.PortalUtils;
 import life.qbic.samplesize.control.Controller;
 
@@ -43,9 +42,6 @@ public class SamplesizePortlet extends QBiCPortletUI {
     String user = "admin";
     if (PortalUtils.isLiferayPortlet()) {
       user = PortalUtils.getUser().getScreenName();
-    } else {
-      LiferayIndependentConfigurationManager.Instance.init("local.properties");
-      config = LiferayIndependentConfigurationManager.Instance;
     }
     OpenBisClient openbis = null;
     try {

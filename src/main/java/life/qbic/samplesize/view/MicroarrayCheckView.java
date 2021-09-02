@@ -1,15 +1,15 @@
 package life.qbic.samplesize.view;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
+import java.util.Set;
 import com.vaadin.data.Property.ValueChangeEvent;
 import com.vaadin.data.Property.ValueChangeListener;
 import com.vaadin.ui.Button;
 import com.vaadin.ui.Label;
 import com.vaadin.ui.Button.ClickEvent;
 import com.vaadin.ui.ComboBox;
-
 import life.qbic.portal.Styles;
 import life.qbic.portal.Styles.NotificationType;
 import life.qbic.samplesize.components.SliderWithLabel;
@@ -90,10 +90,10 @@ public class MicroarrayCheckView extends AHeatMapPrepView {
       }
     });
   }
-  
+
   @Override
   public Map<String, String> getProps() {
-    Map<String,String> res = super.getProps();
+    Map<String, String> res = super.getProps();
     res.put("Q_SECONDARY_NAME", "Power Estimation");
     return res;
   }

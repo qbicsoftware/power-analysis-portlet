@@ -1,18 +1,15 @@
 package life.qbic.samplesize.view;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
+import java.util.Set;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
 import com.vaadin.data.Property.ValueChangeEvent;
 import com.vaadin.data.Property.ValueChangeListener;
 import com.vaadin.ui.Button;
 import com.vaadin.ui.ComboBox;
 import com.vaadin.ui.Button.ClickEvent;
-
 import life.qbic.portal.Styles;
 import life.qbic.portal.Styles.NotificationType;
 import life.qbic.samplesize.control.MathHelpers;
@@ -91,13 +88,17 @@ public class RNASeqCheckView extends ARNASeqPrepView {
   }
 
   protected int getMinSampleSizeOfFactor() {
-    List<Integer> groups = factorToLevelSize.get(factors.getValue());
-    return Math.min(groups.get(0), groups.get(1));
+    List<Integer> levels = factorToLevelSize.get(factors.getValue());
+    int res = Integer.MAX_VALUE;
+    for (int groupSize : levels) {
+      res = Math.min(res, groupSize);
+    }
+    return res;
   }
 
   @Override
   public Map<String, String> getProps() {
-    Map<String,String> res = super.getProps();
+    Map<String, String> res = super.getProps();
     res.put("Q_SECONDARY_NAME", "Power Estimation");
     return res;
   }

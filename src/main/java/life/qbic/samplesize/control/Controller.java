@@ -1,6 +1,5 @@
 package life.qbic.samplesize.control;
 
-import java.io.Serializable;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Date;
@@ -11,19 +10,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
-
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
 import com.vaadin.data.Property.ValueChangeEvent;
 import com.vaadin.data.Property.ValueChangeListener;
 import com.vaadin.server.ExternalResource;
 import com.vaadin.server.FontAwesome;
 import com.vaadin.server.Resource;
-import com.vaadin.server.Sizeable.Unit;
 import com.vaadin.shared.ui.combobox.FilteringMode;
 import com.vaadin.ui.ComboBox;
 import com.vaadin.ui.Image;
@@ -32,18 +28,15 @@ import com.vaadin.ui.Table;
 import com.vaadin.ui.UI;
 import com.vaadin.ui.VerticalLayout;
 import com.vaadin.ui.Window;
-import com.vaadin.ui.themes.ValoTheme;
 import com.vaadin.ui.Button;
 import com.vaadin.ui.Button.ClickEvent;
 import com.vaadin.ui.Button.ClickListener;
 import com.vaadin.ui.Table.Align;
-
-import ch.systemsx.cisd.openbis.dss.client.api.v1.DataSet;
-import ch.systemsx.cisd.openbis.generic.shared.api.v1.dto.EntityRegistrationDetails;
-import ch.systemsx.cisd.openbis.generic.shared.api.v1.dto.Experiment;
-import ch.systemsx.cisd.openbis.generic.shared.api.v1.dto.Project;
-import ch.systemsx.cisd.openbis.generic.shared.api.v1.dto.Sample;
-import ch.systemsx.cisd.openbis.plugin.query.shared.api.v1.dto.QueryTableModel;
+import ch.ethz.sis.openbis.generic.asapi.v3.dto.dataset.DataSet;
+import ch.ethz.sis.openbis.generic.asapi.v3.dto.experiment.Experiment;
+import ch.ethz.sis.openbis.generic.asapi.v3.dto.project.Project;
+import ch.ethz.sis.openbis.generic.asapi.v3.dto.sample.Sample;
+import ch.ethz.sis.openbis.generic.dssapi.v3.dto.datasetfile.DataSetFile;
 import life.qbic.datamodel.identifiers.ExperimentCodeFunctions;
 import life.qbic.openbis.openbisclient.OpenBisClient;
 import life.qbic.portal.Styles;
@@ -55,7 +48,6 @@ import life.qbic.samplesize.view.MicroarrayEstimationView;
 import life.qbic.samplesize.view.RNASeqCheckView;
 import life.qbic.samplesize.view.RNASeqEstimationView;
 import life.qbic.xml.manager.StudyXMLParser;
-import life.qbic.xml.manager.XMLParser;
 import life.qbic.xml.properties.Property;
 import life.qbic.xml.study.Qexperiment;
 
@@ -81,6 +73,14 @@ public class Controller {
 
   private HashMap<String, Resource> resourcesForSamples;
 
+  private Map<Pair<String, String>, Property> factorsAndLabelsForSamples;
+
+  private Set<String> factorLabels;
+
+  private StudyXMLParser studyXMLParser;
+
+  private JAXBElement<Qexperiment> expDesign;
+
   public Controller(OpenBisClient openbis, VerticalLayout layout, ConfigurationManager config,
       String user) {
     this.openbis = openbis;
@@ -93,9 +93,9 @@ public class Controller {
     final List<Project> projects = openbis.listProjects();
     List<String> projectIDs = new ArrayList<>();
     for (Project p : projects) {
-      String space = p.getSpaceCode();
+      String space = p.getSpace().getCode();
       if (spaces.contains(space)) {
-        projectIDs.add(p.getIdentifier());
+        projectIDs.add(p.getIdentifier().getIdentifier());
       }
     }
 
@@ -160,7 +160,7 @@ public class Controller {
           Map<String, List<Integer>> sampleSizesOfFactorLevels =
               getSampleSizesForFactors(infoExpID);
 
-          List<Sample> samples = openbis.getSamplesOfProjectBySearchService(projectID);
+          List<Sample> samples = openbis.getSamplesOfProject(projectID);
 
           showExistingRuns(samples);
           String newSampleCode = newPowerSampleCode(samples);
@@ -197,13 +197,12 @@ public class Controller {
 
     runTable.removeAllItems();
     for (Sample s : samples) {
-      if (s.getSampleTypeCode().equals(POWER_SAMPLE_TYPE)) {
-        relevantSampleIDs.add(s.getIdentifier());
+      if (s.getType().getCode().equals(POWER_SAMPLE_TYPE)) {
+        relevantSampleIDs.add(s.getIdentifier().getIdentifier());
 
         Map<String, String> props = s.getProperties();
         String tech = props.get("Q_TECHNOLOGY_TYPE");
         String type = props.get("Q_SECONDARY_NAME");
-        String xml = props.get("Q_PROPERTIES");
         Button download = new Button();
         // download.addStyleName(ValoTheme.BUTTON_ICON_ALIGN_RIGHT);
         download.setIcon(FontAwesome.DOWNLOAD);
@@ -219,7 +218,8 @@ public class Controller {
 
           @Override
           public void buttonClick(ClickEvent event) {
-            preparePopUpView(xml, resourcesForSamples.get(s.getIdentifier()));
+            preparePopUpView(s.getCode(),
+                resourcesForSamples.get(s.getIdentifier().getIdentifier()));
           }
         });
 
@@ -228,9 +228,8 @@ public class Controller {
         row.add(download);
         row.add(showResult);
 
-        EntityRegistrationDetails regDetails = s.getRegistrationDetails();
-        String user = regDetails.getModifierFirstName() + " " + regDetails.getModifierLastName();
-        Date regDate = regDetails.getRegistrationDate();
+        String user = s.getModifier().getFirstName() + " " + s.getModifier().getLastName();
+        Date regDate = s.getRegistrationDate();
 
         row.add(user);
         row.add(regDate);
@@ -247,7 +246,7 @@ public class Controller {
     }
   }
 
-  private void preparePopUpView(String xml, Resource resource) {
+  private void preparePopUpView(String sampleCode, Resource resource) {
     Window subWindow = new Window("Results");
     subWindow.setWidth("600");
     subWindow.setHeight("800");
@@ -282,14 +281,10 @@ public class Controller {
     params.addContainerProperty("Name", String.class, "");
     params.addContainerProperty("Value", String.class, "");
     params.setVisible(false);
-    XMLParser xmlParser = new XMLParser();
-    List<Property> props = new ArrayList<>();
-    try {
-      props = xmlParser.getPropertiesFromXML(xml);
-    } catch (JAXBException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    }
+
+    List<Property> props =
+        studyXMLParser.getFactorsAndPropertiesForSampleCode(expDesign, sampleCode);
+
     for (Property p : props) {
       List<Object> row = new ArrayList<Object>();
       row.add(p.getLabel());
@@ -325,7 +320,7 @@ public class Controller {
     int latest = 0;
     String prefix = samples.get(0).getCode().split("-")[0];
     for (Sample s : samples) {
-      if (s.getSampleTypeCode().equals(POWER_SAMPLE_TYPE)) {
+      if (s.getType().getCode().equals(POWER_SAMPLE_TYPE)) {
         String suffix = s.getCode().split("-")[1];
         int num = Integer.parseInt(suffix);
         latest = Math.max(latest, num);
@@ -344,14 +339,13 @@ public class Controller {
   }
 
   private String createStatisticsSample(List<Property> xmlProps, Map<String, String> props) {
-    XMLParser xmlParser = new XMLParser();
-    String qProperties = "";
-    try {
-      qProperties = xmlParser.toString(xmlParser.createXMLFromProperties(xmlProps));
-    } catch (JAXBException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    }
+    // String qProperties = "";
+    // try {
+    // qProperties = xmlParser.toString(xmlParser.createXMLFromProperties(xmlProps));
+    // } catch (JAXBException e) {
+    // // TODO Auto-generated catch block
+    // e.printStackTrace();
+    // }
     // openbis.ingest(dss, serviceName, params);
     Map<String, Object> params = new HashMap<String, Object>();
     params.put("code", newSampleCode);
@@ -367,27 +361,34 @@ public class Controller {
     StringBuilder result = new StringBuilder();
     result.append("Input Files: ");
 
-    props.put("Q_PROPERTIES", qProperties);
-    params.put("properties", props);
+    // props.put("Q_PROPERTIES", qProperties);
+    // params.put("properties", props);
 
     openbis.ingest("DSS1", "register-samp", params);
     return newSampleCode;
   }
 
   private Map<String, List<Integer>> getSampleSizesForFactors(String infoExp) {
-    List<Experiment> exps = openbis.getExperimentById2(infoExp);
+    Experiment exp = openbis.getExperimentById(infoExp);
     Map<String, List<Integer>> res = new HashMap<>();
-    if (exps.isEmpty()) {
+    if (exp == null) {
       logger.error("could not find info experiment" + infoExp);
     } else {
-      Experiment designExperiment = exps.get(0);
-      StudyXMLParser parser = new StudyXMLParser();
-      JAXBElement<Qexperiment> expDesign;
+      studyXMLParser = new StudyXMLParser();
       try {
-        expDesign =
-            parser.parseXMLString(designExperiment.getProperties().get("Q_EXPERIMENTAL_SETUP"));
+        expDesign = studyXMLParser.parseXMLString(exp.getProperties().get("Q_EXPERIMENTAL_SETUP"));
         logger.debug("setting exp design: " + expDesign);
-        res = parser.getSampleSizesOfFactorLevels(expDesign);
+
+        Map<String, Map<String, Set<String>>> sizeMap =
+            studyXMLParser.getSamplesPerLevelForFactors(expDesign);
+        for (String factor : sizeMap.keySet()) {
+          List<Integer> groupSizes = new ArrayList<>();
+          Map<String, Set<String>> levels = sizeMap.get(factor);
+          for (Set<String> samples : levels.values()) {
+            groupSizes.add(samples.size());
+          }
+          res.put(factor, groupSizes);
+        }
       } catch (JAXBException e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
@@ -407,16 +408,12 @@ public class Controller {
       String dsCode = ds.getCode();
       dsCodes.add(dsCode);
       System.out.println(ds);
-      System.out.println(ds.getSampleIdentifierOrNull());
-      dataSetCodeToSampleID.put(dsCode, ds.getSampleIdentifierOrNull());
-    }
-    params.put("codes", dsCodes);
-    QueryTableModel res = openbis.queryFileInformation(params);
+      String sampleID = ds.getSample().getIdentifier().getIdentifier();
+      System.out.println(sampleID);
+      dataSetCodeToSampleID.put(dsCode, sampleID);
 
-    for (Serializable[] ss : res.getRows()) {
-      String dsCode = (String) ss[0];
-      // String fileName = (String) ss[2];
-      String dssPath = (String) ss[1];
+      List<DataSetFile> files = openbis.getFilesOfDataSetWithID(dsCode);
+      String dssPath = files.get(0).getPath();
       try {
         URL url = openbis.getDataStoreDownloadURLLessGeneric(dsCode, dssPath);
         Resource resource = new ExternalResource(url);
