@@ -21,7 +21,7 @@ public class MicroarrayEstimationView extends AHeatMapPrepView {
   SliderWithLabel deGenesSlider;
   public MicroarrayEstimationView(RController R, SliderFactory deGenes, String title, String infoText, String link) {
     super(R, title, infoText, link);
-//    prepareRCode(R);
+    prepareRCode(R);
 
     deGenesSlider = deGenes.getSliderWithLabel();
 

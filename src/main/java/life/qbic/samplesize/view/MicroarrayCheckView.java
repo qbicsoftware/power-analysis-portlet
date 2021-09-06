@@ -35,7 +35,7 @@ public class MicroarrayCheckView extends AHeatMapPrepView {
 
   public MicroarrayCheckView(RController R, SliderFactory sensitivity, String title, String infoText, String link) {
     super(R, title, infoText, link);
-//    prepareRCode(R);
+    prepareRCode(R);
 
     factors = new ComboBox("Study Factor");
     factors.setNullSelectionAllowed(false);
