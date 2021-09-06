@@ -15,7 +15,6 @@ import life.qbic.portal.Styles;
 import life.qbic.portal.Styles.NotificationType;
 import life.qbic.portal.utils.ConfigurationManager;
 import life.qbic.portal.utils.ConfigurationManagerFactory;
-import life.qbic.portal.utils.LiferayIndependentConfigurationManager;
 import life.qbic.portal.utils.PortalUtils;
 import life.qbic.samplesize.control.Controller;
 
@@ -48,17 +47,19 @@ public class SamplesizePortlet extends QBiCPortletUI {
     String user = "admin";
     if (PortalUtils.isLiferayPortlet()) {
       user = PortalUtils.getUser().getScreenName();
-    } else {
-      LiferayIndependentConfigurationManager.Instance.init("local.properties");
-      config = LiferayIndependentConfigurationManager.Instance;
     }
     OpenBisClient openbis = null;
     try {
       logger.debug("trying to connect to openbis");
-      openbis = new OpenBisClient(config.getDataSourceUser(), config.getDataSourcePassword(),
-          config.getDataSourceUrl());
+      final String baseURL = config.getDataSourceUrl();
+      final String apiURL = baseURL + "/openbis/openbis";
+
+      openbis =
+          new OpenBisClient(config.getDataSourceUser(), config.getDataSourcePassword(), apiURL);
       openbis.login();
     } catch (Exception e) {
+      System.out.println(e.getMessage());
+      System.out.println(e.getCause());
       success = false;
       logger.error("User \"" + user
           + "\" could not connect to openBIS and has been informed of this.");

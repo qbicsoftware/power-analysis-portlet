@@ -4,10 +4,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
 import com.vaadin.data.Property.ValueChangeEvent;
 import com.vaadin.data.Property.ValueChangeListener;
 import com.vaadin.ui.Button;
@@ -17,7 +15,6 @@ import com.vaadin.ui.UI;
 import com.vaadin.ui.VerticalLayout;
 import com.vaadin.ui.Window;
 import com.vaadin.ui.Button.ClickEvent;
-
 import life.qbic.portal.Styles;
 import life.qbic.portal.Styles.NotificationType;
 import life.qbic.samplesize.control.MathHelpers;
@@ -27,6 +24,11 @@ import life.qbic.samplesize.model.SliderFactory;
 import life.qbic.xml.properties.Property;
 import life.qbic.xml.properties.PropertyType;
 
+/**
+ * 
+ * @author afriedrich
+ *
+ */
 public class RNASeqCheckView extends ARNASeqPrepView {
 
   private static final Logger logger = LogManager.getLogger(RNASeqCheckView.class);
@@ -37,9 +39,9 @@ public class RNASeqCheckView extends ARNASeqPrepView {
   private Map<String, Set<String>> selectedLevels;
   
   public RNASeqCheckView(VMConnection v, SliderFactory deGenes, SliderFactory fdr,
-      SliderFactory minFC, SliderFactory avgReads, SliderFactory dispersion) {
-    
-    super(deGenes, fdr, minFC, avgReads, dispersion);
+      SliderFactory minFC, SliderFactory avgReads, SliderFactory dispersion, String title,
+      String infoText, String link) {
+    super(deGenes, fdr, minFC, avgReads, dispersion, title, infoText, link);
 
     factors = new ComboBox("Study Factor");
     
@@ -176,11 +178,18 @@ public class RNASeqCheckView extends ARNASeqPrepView {
     subWindow.center();
     // Open it in the UI
     UI.getCurrent().addWindow(subWindow);
+//old
+    //  List<Integer> levels = factorToLevelSize.get(factors.getValue());
+  //  int res = Integer.MAX_VALUE;
+  //  for (int groupSize : levels) {
+   //   res = Math.min(res, groupSize);
+   // }
+   // return res;
   }
 
   @Override
   public Map<String, String> getProps() {
-    Map<String,String> res = super.getProps();
+    Map<String, String> res = super.getProps();
     res.put("Q_SECONDARY_NAME", "Power Estimation");
     return res;
   }
@@ -207,7 +216,9 @@ public class RNASeqCheckView extends ARNASeqPrepView {
   public void setDesigns(Map<String, Map<String, Set<String>>> sampleSizesOfFactorLevels) {
     this.sampleSizesOfFactorLevels = sampleSizesOfFactorLevels;
     factors.removeAllItems();
-    factors.addItems(sampleSizesOfFactorLevels.keySet());
+    if (!sampleSizesOfFactorLevels.isEmpty()) {
+      factors.addItems(sampleSizesOfFactorLevels.keySet());
+    }
   }
 
 }

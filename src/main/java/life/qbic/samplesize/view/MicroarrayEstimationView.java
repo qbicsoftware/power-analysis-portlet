@@ -19,9 +19,8 @@ import life.qbic.xml.properties.PropertyType;
 public class MicroarrayEstimationView extends AHeatMapPrepView {
 
   SliderWithLabel deGenesSlider;
-
-  public MicroarrayEstimationView(RController R, SliderFactory deGenes) {
-    super(R);
+  public MicroarrayEstimationView(RController R, SliderFactory deGenes, String title, String infoText, String link) {
+    super(R, title, infoText, link);
     prepareRCode(R);
 
     deGenesSlider = deGenes.getSliderWithLabel();

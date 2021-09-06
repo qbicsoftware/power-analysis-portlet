@@ -33,9 +33,9 @@ public abstract class ARNASeqPrepView extends AContainerPrepView {
       avgReadCountSlider, dispersionSlider;
 
   public ARNASeqPrepView(SliderFactory deGenes, SliderFactory fdr, SliderFactory minFC,
-      SliderFactory avgReads, SliderFactory dispersion) {
-    super();
-
+      SliderFactory avgReads, SliderFactory dispersion, String title, String infoText, String link) {
+    super(title, infoText, link);
+    
     percDEGenesSlider = deGenes.getSliderWithLabel();
     minFoldChangeSlider = minFC.getSliderWithLabel();
     fdrSlider = fdr.getSliderWithLabel();

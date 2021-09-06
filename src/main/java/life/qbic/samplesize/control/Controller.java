@@ -1,6 +1,5 @@
 package life.qbic.samplesize.control;
 
-import java.io.Serializable;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Date;
@@ -11,13 +10,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
 import com.vaadin.data.Property.ValueChangeEvent;
 import com.vaadin.data.Property.ValueChangeListener;
 import com.vaadin.server.ExternalResource;
@@ -25,23 +21,23 @@ import com.vaadin.server.FontAwesome;
 import com.vaadin.server.Resource;
 import com.vaadin.shared.ui.combobox.FilteringMode;
 import com.vaadin.ui.ComboBox;
-import com.vaadin.ui.Image;
+import com.vaadin.ui.Embedded;
+import com.vaadin.ui.Link;
 import com.vaadin.ui.TabSheet;
 import com.vaadin.ui.Table;
 import com.vaadin.ui.UI;
 import com.vaadin.ui.VerticalLayout;
 import com.vaadin.ui.Window;
+import com.vaadin.ui.BrowserFrame;
 import com.vaadin.ui.Button;
 import com.vaadin.ui.Button.ClickEvent;
 import com.vaadin.ui.Button.ClickListener;
 import com.vaadin.ui.Table.Align;
-
-import ch.systemsx.cisd.openbis.dss.client.api.v1.DataSet;
-import ch.systemsx.cisd.openbis.generic.shared.api.v1.dto.EntityRegistrationDetails;
-import ch.systemsx.cisd.openbis.generic.shared.api.v1.dto.Experiment;
-import ch.systemsx.cisd.openbis.generic.shared.api.v1.dto.Project;
-import ch.systemsx.cisd.openbis.generic.shared.api.v1.dto.Sample;
-import ch.systemsx.cisd.openbis.plugin.query.shared.api.v1.dto.QueryTableModel;
+import ch.ethz.sis.openbis.generic.asapi.v3.dto.dataset.DataSet;
+import ch.ethz.sis.openbis.generic.asapi.v3.dto.experiment.Experiment;
+import ch.ethz.sis.openbis.generic.asapi.v3.dto.project.Project;
+import ch.ethz.sis.openbis.generic.asapi.v3.dto.sample.Sample;
+import ch.ethz.sis.openbis.generic.dssapi.v3.dto.datasetfile.DataSetFile;
 import life.qbic.datamodel.identifiers.ExperimentCodeFunctions;
 import life.qbic.datamodel.samples.SampleType;
 import life.qbic.openbis.openbisclient.OpenBisClient;
@@ -56,13 +52,34 @@ import life.qbic.samplesize.view.MicroarrayEstimationView;
 import life.qbic.samplesize.view.RNASeqCheckView;
 import life.qbic.samplesize.view.RNASeqEstimationView;
 import life.qbic.xml.manager.StudyXMLParser;
-import life.qbic.xml.manager.XMLParser;
 import life.qbic.xml.properties.Property;
 import life.qbic.xml.study.Qexperiment;
 
 public class Controller {
 
   private static final Logger logger = LogManager.getLogger(Controller.class);
+
+  private final String microArrayPowerInformation =
+      "Predicts false discovery rate (FDR) based on fold change of interest and sample size per group. Based on the "
+          + "R package OCplus by Pawitan et al. (2013)";
+
+  private final String microArrayExperimentalDesignInformation =
+      "Predicts the power of an experimental design based on its sample size. False discovery rate (FDR) is shown as "
+          + "a function of the detectable log fold change as well as the ratio of non-differentially expressed genes in "
+          + "the data. Based on the R package OCplus by Pawitan et al. (2013)";
+
+  private final String RNAPowerInformation = "";
+
+  private final String RNAExperimentalDesignInformation = "Estimates statistical power for a known experimental design. "
+      + "Creates a power matrix showing statistical power as a function of false discovery rate and minimum detectable "
+      + "fold change between groups. Users can select maximum false discovery rate, the estimated ratio of differentially expressed "
+      + "genes.";
+  
+  private final String ocPlus =
+      "https://www.bioconductor.org/packages/release/bioc/html/OCplus.html";
+
+  private final String rnaseqsamplesize =
+      "http://www.bioconductor.org/packages/release/bioc/html/RnaSeqSampleSize.html";
 
   private OpenBisClient openbis;
   private VerticalLayout mainLayout;
@@ -83,6 +100,10 @@ public class Controller {
 
   private HashMap<String, Resource> resourcesForSamples;
 
+  private StudyXMLParser studyXMLParser;
+
+  private JAXBElement<Qexperiment> expDesign;
+
   public Controller(OpenBisClient openbis, VerticalLayout layout, ConfigurationManager config,
       String user) {
     this.openbis = openbis;
@@ -95,9 +116,9 @@ public class Controller {
     final List<Project> projects = openbis.listProjects();
     List<String> projectIDs = new ArrayList<>();
     for (Project p : projects) {
-      String space = p.getSpaceCode();
+      String space = p.getSpace().getCode();
       if (spaces.contains(space)) {
-        projectIDs.add(p.getIdentifier());
+        projectIDs.add(p.getIdentifier().getIdentifier());
       }
     }
     // new Statistics(openbis, projectIDs);
@@ -109,7 +130,6 @@ public class Controller {
         config.getRServeUser(), config.getRServePassword());
 
     initView(vm, R, projectIDs);
-
   }
 
   /**
@@ -145,19 +165,31 @@ public class Controller {
     SliderFactory dispersion =
         new SliderFactory("Average dispersion", "phi0", 4, 0.0001, 20, 1, "200px");
 
-    RNASeqCheckView rnaCheckView =
-        new RNASeqCheckView(vm, deGenes, fdr, minFC, avgReads, dispersion);
-    RNASeqEstimationView rnaEstView =
-        new RNASeqEstimationView(vm, deGenes, fdr, minFC, avgReads, dispersion);
-    MicroarrayCheckView maCheckView = new MicroarrayCheckView(R, sensitivity);
-    MicroarrayEstimationView maEstView = new MicroarrayEstimationView(R, deGenes);
+    RNASeqCheckView rnaCheckView = new RNASeqCheckView(vm, deGenes, fdr, minFC, avgReads,
+        dispersion, "RNASeq Power Estimation based on Experimental Design",
+        RNAExperimentalDesignInformation, rnaseqsamplesize);
+    RNASeqEstimationView rnaEstView = new RNASeqEstimationView(vm, deGenes, fdr, minFC, avgReads,
+        dispersion, "RNASeq Power Estimation", RNAPowerInformation, rnaseqsamplesize);
+    MicroarrayCheckView maCheckView = new MicroarrayCheckView(R, sensitivity,
+        "Microarray Power Estimation based on Experimental Design",
+        microArrayExperimentalDesignInformation, ocPlus);
+    MicroarrayEstimationView maEstView = new MicroarrayEstimationView(R, deGenes,
+        "Microarray Power Estimation", microArrayPowerInformation, ocPlus);
+
+
     tabs.addTab(rnaCheckView, "Exp. Design RNA-Seq");
     tabs.addTab(rnaEstView, "RNA-Seq");
     tabs.addTab(maEstView, "Microarrays");
     tabs.addTab(maCheckView, "Exp. Design Microarrays");
 
+
+
+    tabs.getTab(rnaCheckView).setEnabled(false);
+    tabs.getTab(maCheckView).setEnabled(false);
+
     initTabButtonListener(rnaCheckView);
     initTabButtonListener(rnaEstView);
+
     // initTabButtonListener(maEstView);
     // initTabButtonListener(maCheckView);
 
@@ -177,64 +209,54 @@ public class Controller {
           project = projectID.split("/")[2];
           infoExpID = ExperimentCodeFunctions.getInfoExperimentID(space, project);
 
-          // List<String> fileNames = getFilenamesOfProject(projectID);
-          //
-          // getFactors(infoExpID);
-          // mapExperimentalProperties(projectID, fileNames);
-
-
-          // List<Sample> samples = openbis.getSamplesOfProjectBySearchService(projectID);
-          List<Sample> samples =
-              openbis.getSamplesWithParentsAndChildrenOfProjectBySearchService(projectID);
-          System.out.println(samples.size() + " samples");
-          SampleTypesInfo sampleInfo = sortBySampleTypes(samples);
-          System.out.println("got infos");
-          Map<String, Set<Sample>> samplesByType = sampleInfo.getSamplesByType();
-          System.out.println("by type");
-          Map<String, Map<String, Set<String>>> sampleSizesOfFactorLevels =
-              getSampleSizesForFactors(infoExpID, sampleInfo.getCodesByType());
-          System.out.println("factor stuff");
-          showExistingRuns(samplesByType.get(POWER_SAMPLE_TYPE));
-          System.out.println("existing runs");
-          List<RNACountData> pilotData =
+          List<Sample> allSamples = openbis.getSamplesOfProject(projectID);
+          Map<String, List<Sample>> samplesByType = new HashMap<>();
+          for (Sample s : allSamples) {
+            String type = s.getType().getCode();
+            if (samplesByType.containsKey(type)) {
+              samplesByType.get(type).add(s);
+            } else {
+              List<Sample> list = new ArrayList<>(Arrays.asList(s));
+              samplesByType.put(type, list);
+            }
+          }
+          Map<String, List<Integer>> sampleSizesOfFactorLevels =
+              getSampleSizesForFactors(infoExpID, samplesByType);
+          
+         List<RNACountData> pilotData =
               preparePilotDataInfo(samplesByType.get(RNASEQ_COUNT_SAMPLE_TYPE));
           System.out.println("pilotdata");
-          String newSampleCode = newPowerSampleCode(samples);
+          
+          List<Sample> powerSamples = samplesByType.get(POWER_SAMPLE_TYPE);
+          if (powerSamples == null) {
+            powerSamples = new ArrayList<>();
+          }
+
+          showExistingRuns(powerSamples);
+          String newSampleCode = newPowerSampleCode(powerSamples);
 
           maEstView.setProjectContext(projectID, newSampleCode);
           rnaEstView.setProjectContext(projectID, newSampleCode, pilotData);
           maCheckView.setProjectContext(projectID, newSampleCode);
           rnaCheckView.setProjectContext(projectID, newSampleCode, pilotData);
+          enableDesignBasedViews(!sampleSizesOfFactorLevels.isEmpty());
           maCheckView.setDesigns(sampleSizesOfFactorLevels);
           rnaCheckView.setDesigns(sampleSizesOfFactorLevels);
         }
       }
-
-      private SampleTypesInfo sortBySampleTypes(List<Sample> samples) {
-        Map<String, Set<Sample>> sampleMap = new HashMap<>();
-        Map<String, Set<String>> codeMap = new HashMap<>();
-        for (Sample s : samples) {
-          String type = s.getSampleTypeCode();
-          String code = s.getCode();
-          if (sampleMap.containsKey(type)) {
-            sampleMap.get(type).add(s);
-            codeMap.get(type).add(code);
-          } else {
-            Set<Sample> sampleList = new HashSet<>(Arrays.asList(s));
-            Set<String> codeList = new HashSet<>(Arrays.asList(code));
-            sampleMap.put(type, sampleList);
-            codeMap.put(type, codeList);
-          }
-        }
-        return new SampleTypesInfo(sampleMap, codeMap);
+      private void enableDesignBasedViews(boolean hasDesign) {
+        tabs.getTab(maCheckView).setEnabled(hasDesign);
+        tabs.getTab(rnaCheckView).setEnabled(hasDesign);
       }
+      
     });
+    
     runTable = new Table("Existing Calculations");
     runTable.setVisible(false);
     runTable.setStyleName(Styles.tableTheme);
     runTable.addContainerProperty("Technology", String.class, "");
     runTable.addContainerProperty("Result Type", String.class, "");
-    runTable.addContainerProperty("Download", Button.class, null);
+    runTable.addContainerProperty("Download", Link.class, null);
     runTable.setColumnAlignment("Download", Align.CENTER);
     runTable.addContainerProperty("Show", Button.class, null);
     runTable.setColumnWidth("Show", 60);
@@ -276,107 +298,131 @@ public class Controller {
     }
     return res;
   }
-
-  protected void showExistingRuns(Set<Sample> set) {
-    if (set == null)
-      return;
-    List<String> relevantSampleIDs = new ArrayList<>();
+                                      
+  protected void showExistingRuns(List<Sample> powerSamples) {
+    mapSampleIDsToMatrixImages(powerSamples);
 
     runTable.removeAllItems();
-    for (Sample s : set) {
-      if (s.getSampleTypeCode().equals(POWER_SAMPLE_TYPE)) {
-        relevantSampleIDs.add(s.getIdentifier());
 
-        Map<String, String> props = s.getProperties();
-        String tech = props.get("Q_TECHNOLOGY_TYPE");
-        String type = props.get("Q_SECONDARY_NAME");
-        String xml = props.get("Q_PROPERTIES");
-        Button download = new Button();
-        // download.addStyleName(ValoTheme.BUTTON_ICON_ALIGN_RIGHT);
-        download.setIcon(FontAwesome.DOWNLOAD);
-        // download.setWidth(30, Unit.PIXELS);
-        // download.setHeight(40, Unit.PIXELS);
-        Button showResult = new Button();
-        // showResult.setWidth(30, Unit.PIXELS);
-        // showResult.setHeight(40, Unit.PIXELS);
-        showResult.setIcon(FontAwesome.PICTURE_O);
+    int runs = powerSamples.size();
 
-        List<Object> row = new ArrayList<Object>();
+    for (Sample s : powerSamples) {
+      Map<String, String> props = s.getProperties();
+      String tech = props.get("Q_TECHNOLOGY_TYPE");
+      String type = props.get("Q_SECONDARY_NAME");
+      // Button download = new Button();
+      // download.addStyleName(ValoTheme.BUTTON_ICON_ALIGN_RIGHT);
+      // download.setWidth(30, Unit.PIXELS);
+      // download.setHeight(40, Unit.PIXELS);
+      Button showResult = new Button();
+      // showResult.setWidth(30, Unit.PIXELS);
+      // showResult.setHeight(40, Unit.PIXELS);
+      showResult.setIcon(FontAwesome.PICTURE_O);
+
+      List<Object> row = new ArrayList<Object>();
+
+      Resource resource = resourcesForSamples.get(s.getIdentifier().getIdentifier());
+
+
+      Link download = new Link(null, resource);
+      download.setTargetName("_blank");
+      download.setIcon(FontAwesome.DOWNLOAD);
+
+      if (resource != null) {
+        showResult.setEnabled(true);
+        download.setEnabled(true);
         showResult.addClickListener(new Button.ClickListener() {
 
           @Override
           public void buttonClick(ClickEvent event) {
-            preparePopUpView(xml, resourcesForSamples.get(s.getIdentifier()));
+            preparePopUpView(s.getCode(), resource);
           }
         });
-
-        row.add(tech);
-        row.add(type);
-        row.add(download);
-        row.add(showResult);
-
-        EntityRegistrationDetails regDetails = s.getRegistrationDetails();
-        String user = regDetails.getModifierFirstName() + " " + regDetails.getModifierLastName();
-        Date regDate = regDetails.getRegistrationDate();
-
-        row.add(user);
-        row.add(regDate);
-
-        runTable.addItem(row.toArray(new Object[row.size()]), s);
-
-        runTable.setVisible(true);
+      } else {
+        showResult.setEnabled(false);
+        showResult.setIcon(FontAwesome.HOURGLASS);
+        download.setEnabled(false);
+        download.setIcon(FontAwesome.HOURGLASS);
       }
+
+      row.add(tech);
+      row.add(type);
+      row.add(download);
+      row.add(showResult);
+
+      String user = s.getModifier().getFirstName() + " " + s.getModifier().getLastName();
+      Date regDate = s.getRegistrationDate();
+
+      row.add(user);
+      row.add(regDate);
+
+      runTable.addItem(row.toArray(new Object[row.size()]), s);
+
     }
-    int runs = runTable.size();
+    runTable.setVisible(runs > 0);
+
     runTable.setPageLength(runs);
-    if (runs > 0) {
-      mapSampleIDsToMatrixImages(relevantSampleIDs);
-    }
   }
 
-  private void preparePopUpView(String xml, Resource resource) {
+  private void preparePopUpView(String sampleCode, Resource resource) {
     Window subWindow = new Window("Results");
-    subWindow.setWidth("600");
-    subWindow.setHeight("800");
+    subWindow.setWidth("800");
+    subWindow.setHeight("1000");
     VerticalLayout subContent = new VerticalLayout();
     subContent.setSpacing(true);
     subContent.setMargin(true);
     subWindow.setContent(subContent);
 
-    Image image = new Image("", resource);
-    subContent.addComponent(image);
+    String MIMEType = resource.getMIMEType();
 
-    Table params = new Table("Parameters");
-    params.setStyleName(Styles.tableTheme);
-    params.addContainerProperty("Name", String.class, "");
-    params.addContainerProperty("Value", String.class, "");
-    params.setVisible(false);
-    XMLParser xmlParser = new XMLParser();
-    List<Property> props = new ArrayList<>();
-    try {
-      props = xmlParser.getPropertiesFromXML(xml);
-    } catch (JAXBException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    }
-    for (Property p : props) {
-      List<Object> row = new ArrayList<Object>();
-      row.add(p.getLabel());
-      String val = p.getValue();
-      if (p.hasUnit()) {
-        val = val + ' ' + p.getUnit();
+    if (MIMEType.endsWith("png")) {
+
+      subContent.addComponent(new Embedded("Matrix", resource));
+
+      // Image image = new Image("DSS image", resource);
+      // mainLayout.addComponent(image);
+
+      Table params = new Table("Parameters");
+      params.setStyleName(Styles.tableTheme);
+      params.addContainerProperty("Name", String.class, "");
+      params.addContainerProperty("Value", String.class, "");
+      params.setVisible(false);
+
+      List<Property> props =
+          studyXMLParser.getFactorsAndPropertiesForSampleCode(expDesign, sampleCode);
+
+      for (Property p : props) {
+        List<Object> row = new ArrayList<Object>();
+        row.add(p.getLabel());
+        String val = p.getValue();
+        if (p.hasUnit()) {
+          val = val + ' ' + p.getUnit();
+        }
+        row.add(val);
+        params.addItem(row.toArray(new Object[row.size()]), p);
+        params.setVisible(true);
       }
-      row.add(val);
-      params.addItem(row.toArray(new Object[row.size()]), p);
-      params.setVisible(true);
-    }
-    params.setPageLength(props.size());
-    subContent.addComponent(params);
+      params.setPageLength(props.size());
+      subContent.addComponent(params);
 
-    // Center it in the browser window
-    subWindow.center();
-    // Open it in the UI
-    UI.getCurrent().addWindow(subWindow);
+      // Center it in the browser window
+      subWindow.center();
+      // Open it in the UI
+      UI.getCurrent().addWindow(subWindow);
+
+    } else if (MIMEType.endsWith("pdf")) {
+      Window window = new Window();
+      window.setWidth("90%");
+      window.setHeight("90%");
+      BrowserFrame e = new BrowserFrame("PDF File", resource);
+      e.setWidth("100%");
+      e.setHeight("100%");
+      window.setContent(e);
+      window.center();
+      window.setModal(true);
+      UI.getCurrent().addWindow(window);
+    }
+
   }
 
   private void initTabButtonListener(APowerView powerView) {
@@ -392,15 +438,16 @@ public class Controller {
 
   private String newPowerSampleCode(List<Sample> samples) {
     int latest = 0;
+    String prefix = project + "000";
     for (Sample s : samples) {
-      if (s.getSampleTypeCode().equals(POWER_SAMPLE_TYPE)) {
+      if (s.getType().getCode().equals(POWER_SAMPLE_TYPE)) {
         String suffix = s.getCode().split("-")[1];
         int num = Integer.parseInt(suffix);
         latest = Math.max(latest, num);
       }
     }
     String suffix = Integer.toString(latest + 1);
-    newSampleCode = project + "-" + suffix;
+    newSampleCode = prefix + "-" + suffix;
     return newSampleCode;
   }
 
@@ -420,7 +467,6 @@ public class Controller {
       // TODO Auto-generated catch block
       e.printStackTrace();
     }
-    // (make sure space, project, experiment and parent sample(s) exist, if applicable!)
     Map<String, Object> params = new HashMap<String, Object>();
     params.put("code", newSampleCode);
     params.put("type", POWER_SAMPLE_TYPE); // sample type - e.g. Q_BMI...
@@ -448,95 +494,104 @@ public class Controller {
     return newSampleCode;
   }
 
-  /**
-   * finds sample sizes of top tier sample type of a factor
-   * 
-   * @param infoExp
-   * @param codesByType
-   * @return
-   */
-  private Map<String, Map<String, Set<String>>> getSampleSizesForFactors(String infoExp,
-      Map<String, Set<String>> codesByType) {
-
-    List<SampleType> factorSampleTypes =
-        new ArrayList<SampleType>(Arrays.asList(SampleType.Q_BIOLOGICAL_ENTITY,
-            SampleType.Q_BIOLOGICAL_SAMPLE, SampleType.Q_TEST_SAMPLE));
-
-    Map<String, Map<String, Set<String>>> factors = getExperimentalDesign(infoExp);
-    Map<String, Map<String, Set<String>>> slimFactors = new HashMap<>();
-    for (SampleType tier : factorSampleTypes) {
-      Set<String> currentCodes = codesByType.get(tier.toString());
-      for (String label : factors.keySet()) {
-        // if label is found, factor was filled in on higher tier of the experimental design
-        if (!slimFactors.containsKey(label)) {
-          Map<String, Set<String>> levels = factors.get(label);
-          Map<String, Set<String>> slimLevels = new HashMap<>();
-          for (String level : levels.keySet()) {
-            Set<String> codesOnFactorLevel = new HashSet<>();
-            for (String code : levels.get(level)) {
-              if (currentCodes.contains(code)) {
-                codesOnFactorLevel.add(code);
-              }
-            }
-            // empty if factor starts on subsequent hierarchy tier (e.g. not a patient factor)
-            if (!codesOnFactorLevel.isEmpty()) {
-              slimLevels.put(level, codesOnFactorLevel);
-            }
-          }
-          if (!slimLevels.isEmpty()) {
-            slimFactors.put(label, slimLevels);
-          }
-        }
-      }
-    }
-    return slimFactors;
-  }
-
-  private Map<String, Map<String, Set<String>>> getExperimentalDesign(String infoExp) {
-    List<Experiment> exps = openbis.getExperimentById2(infoExp);
-    if (exps.isEmpty()) {
+  private Map<String, List<Integer>> getSampleSizesForFactors(String infoExp,
+      Map<String, List<Sample>> samplesByType) {
+    Experiment exp = openbis.getExperimentById(infoExp);
+    Map<String, List<Integer>> res = new HashMap<>();
+    if (exp == null) {
       logger.error("could not find info experiment" + infoExp);
     } else {
-      Experiment designExperiment = exps.get(0);
-      StudyXMLParser parser = new StudyXMLParser();
-      JAXBElement<Qexperiment> expDesign;
+      studyXMLParser = new StudyXMLParser();
       try {
-        expDesign =
-            parser.parseXMLString(designExperiment.getProperties().get("Q_EXPERIMENTAL_SETUP"));
+        expDesign = studyXMLParser.parseXMLString(exp.getProperties().get("Q_EXPERIMENTAL_SETUP"));
         logger.debug("setting exp design: " + expDesign);
-        return parser.getSamplesPerLevelForFactors(expDesign);
-      } catch (
 
-      JAXBException e) {
+        Map<String, Map<String, Set<String>>> sizeMap =
+            studyXMLParser.getSamplesPerLevelForFactors(expDesign);
+        for (String factor : sizeMap.keySet()) {
+          List<Integer> groupSizes = new ArrayList<>();
+          Map<String, Set<String>> levels = sizeMap.get(factor);
+          Set<String> factorSamples = getFactorSampleType(samplesByType, levels);
+          for (Set<String> sampleCodes : levels.values()) {
+            int size = 0;
+            for (String code : sampleCodes) {
+              if (factorSamples.contains(code)) {
+                size++;
+              }
+            }
+            groupSizes.add(size);
+          }
+          res.put(factor, groupSizes);
+        }
+      } catch (JAXBException e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
       }
     }
-    return null;
+    return res;
   }
 
+  private Set<String> getFactorSampleType(Map<String, List<Sample>> samplesByType,
+      Map<String, Set<String>> levels) {
+    List<String> sampleCodes = new ArrayList<>();
+    for (Set<String> codes : levels.values()) {
+      sampleCodes.addAll(codes);
+    }
+    Set<String> res = new HashSet<>();
+    List<SampleType> sampleTypes = new ArrayList<>(Arrays.asList(SampleType.Q_BIOLOGICAL_ENTITY,
+        SampleType.Q_BIOLOGICAL_SAMPLE, SampleType.Q_TEST_SAMPLE));
+    for (SampleType type : sampleTypes) {
+      try {
+        for (Sample s : samplesByType.get(type.toString())) {
+          if (sampleCodes.contains(s.getCode())) {
+            res.add(s.getCode());
+          }
+        }
+        if (res.size() > 0) {
+          return res;
+        }
+      } catch (NullPointerException e) {
+        logger.info(type + " not found.");
+      }
+    }
+    return res;
+  }
 
-  public void mapSampleIDsToMatrixImages(List<String> sampleIDs) {
+  public void mapSampleIDsToMatrixImages(List<Sample> powerSamples) {
     resourcesForSamples = new HashMap<>();
-    List<DataSet> datasets = openbis.listDataSetsForSamples(sampleIDs);
+
+    List<String> sampleIds = new ArrayList<>();
+    if (!powerSamples.isEmpty()) {
+      for (Sample s : powerSamples) {
+        sampleIds.add(s.getIdentifier().getIdentifier());
+      }
+    } else {
+      return;
+    }
+    List<DataSet> datasets = openbis.listDataSetsForSamples(sampleIds);
+
     Map<String, String> dataSetCodeToSampleID = new HashMap<>();
     List<String> dsCodes = new ArrayList<String>();
-    Map<String, List<String>> params = new HashMap<String, List<String>>();
 
     for (DataSet ds : datasets) {
       String dsCode = ds.getCode();
       dsCodes.add(dsCode);
-      dataSetCodeToSampleID.put(dsCode, ds.getSampleIdentifierOrNull());
-    }
-    params.put("codes", dsCodes);
-    QueryTableModel res = openbis.queryFileInformation(params);
+      System.out.println(ds);
+      String sampleID = ds.getSample().getIdentifier().getIdentifier();
+      System.out.println(sampleID);
+      dataSetCodeToSampleID.put(dsCode, sampleID);
 
-    for (Serializable[] ss : res.getRows()) {
-      String dsCode = (String) ss[0];
-      // String fileName = (String) ss[2];
-      String dssPath = (String) ss[1];
+      List<DataSetFile> files = openbis.getFilesOfDataSetWithID(dsCode);
+      String dssPath = files.get(0).getPath();
+      for (DataSetFile file : files) {
+        if (file.getPath().length() > dssPath.length()) {
+          dssPath = file.getPath();
+        }
+      }
       try {
         URL url = openbis.getDataStoreDownloadURLLessGeneric(dsCode, dssPath);
+        url = new URL(url.toString().replace(":444", ""));
+        System.out.println(url);
         Resource resource = new ExternalResource(url);
 
         resourcesForSamples.put(dataSetCodeToSampleID.get(dsCode), resource);
