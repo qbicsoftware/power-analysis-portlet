@@ -1,9 +1,7 @@
 package life.qbic.samplesize.view;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import com.vaadin.data.Property.ValueChangeEvent;
 import com.vaadin.data.Property.ValueChangeListener;
 import com.vaadin.ui.Button;
@@ -27,8 +25,8 @@ public class MicroarrayCheckView extends AHeatMapPrepView {
   private Map<String, List<Integer>> factorToLevelSize;
   private ComboBox factors;
 
-  public MicroarrayCheckView(RController R, SliderFactory sensitivity) {
-    super(R);
+  public MicroarrayCheckView(RController R, SliderFactory sensitivity, String title, String infoText, String link) {
+    super(R, title, infoText, link);
     prepareRCode(R);
 
     sensitivitySlider = sensitivity.getSliderWithLabel();
@@ -127,7 +125,9 @@ public class MicroarrayCheckView extends AHeatMapPrepView {
   public void setDesigns(Map<String, List<Integer>> sampleSizesOfFactorLevels) {
     this.factorToLevelSize = sampleSizesOfFactorLevels;
     factors.removeAllItems();
-    factors.addItems(sampleSizesOfFactorLevels.keySet());
+    if (!sampleSizesOfFactorLevels.isEmpty()) {
+      factors.addItems(sampleSizesOfFactorLevels.keySet());
+    }
   }
 
 }

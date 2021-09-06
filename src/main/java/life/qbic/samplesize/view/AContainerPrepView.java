@@ -8,7 +8,7 @@ public abstract class AContainerPrepView extends APowerView {
   
   private List<PowerAnalysisRun> runs;
   
-  public AContainerPrepView() {
-    super();
+  public AContainerPrepView(String title, String infoText, String link) {
+    super(title, infoText, link);
   }
 }

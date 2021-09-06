@@ -20,9 +20,9 @@ public class VMConnection {
     this.user = user;
   }
 
-  private ArrayList<String> getMatrixCommandBase(String project) {
+  private ArrayList<String> getMatrixCommandBase(String sampleCode) {
     ArrayList<String> res =
-        new ArrayList<>(Arrays.asList("ssh", vm, "singularity", "run", container, user, project));
+        new ArrayList<>(Arrays.asList("ssh", vm, "singularity", "run", container, user, sampleCode));
     return res;
   }
 
@@ -95,18 +95,18 @@ public class VMConnection {
     return res;
   }
 
-  public void sampleSize(String project, int genes, int deGenes, double dispersion, double fdr,
+  public void sampleSize(String sampleCode, int genes, int deGenes, double dispersion, double fdr,
       double avgReadsPerGene) {
-    List<String> cmd = getMatrixCommandBase(project);
+    List<String> cmd = getMatrixCommandBase(sampleCode);
     cmd.add("samples");
     cmd.add("none");
     cmd.addAll(getSampleSizeMatrixCommand(genes, deGenes, fdr, dispersion, avgReadsPerGene));
     runCommand(cmd);
   }
 
-  public void sampleSizeWithData(String project, int genes, int deGenes, double fdr, String dataset,
+  public void sampleSizeWithData(String sampleCode, int genes, int deGenes, double fdr, String dataset,
       EstimationMode mode) {
-    List<String> cmd = getMatrixCommandBase(project);
+    List<String> cmd = getMatrixCommandBase(sampleCode);
     cmd.add("samples");
     cmd.add(mode.toString().toLowerCase());
     cmd.addAll(getSampleSizeMatrixWithDataCommand(genes, deGenes, fdr, dataset));
@@ -125,9 +125,9 @@ public class VMConnection {
    * @param mode either 'tcga' for a dataset from the cancer genome atlas, or 'data' for any other
    *        dataset
    */
-  public void powerWithData(String project, int genes, int deGenes, int sampleSize, double fdr,
+  public void powerWithData(String sampleCode, int genes, int deGenes, int sampleSize, double fdr,
       String dataset, EstimationMode mode) {
-    List<String> cmd = getMatrixCommandBase(project);
+    List<String> cmd = getMatrixCommandBase(sampleCode);
     cmd.add("power");
     cmd.add(mode.toString().toLowerCase());
     cmd.addAll(getPowerMatrixWithDataCommand(genes, deGenes, sampleSize, fdr, dataset));
@@ -160,9 +160,9 @@ public class VMConnection {
    *        coefficient of variance
    * @param fdr false discovery rate cutoff
    */
-  public void power(String project, int genes, int deGenes, int sampleSize, double dispersion,
+  public void power(String sampleCode, int genes, int deGenes, int sampleSize, double dispersion,
       double fdr) {
-    List<String> cmd = getMatrixCommandBase(project);
+    List<String> cmd = getMatrixCommandBase(sampleCode);
     cmd.add("power");
     cmd.add("none");
     cmd.addAll(getPowerMatrixCommand(genes, deGenes, sampleSize, dispersion, fdr));

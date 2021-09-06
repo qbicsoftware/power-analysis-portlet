@@ -1,12 +1,9 @@
 package life.qbic.samplesize.view;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
 import com.vaadin.ui.Button;
 import com.vaadin.ui.Button.ClickEvent;
-
 import life.qbic.samplesize.control.MathHelpers;
 import life.qbic.samplesize.control.VMConnection;
 import life.qbic.samplesize.model.EstimationMode;
@@ -17,8 +14,9 @@ import life.qbic.xml.properties.PropertyType;
 public class RNASeqEstimationView extends ARNASeqPrepView {
 
   public RNASeqEstimationView(VMConnection v, SliderFactory deGenes, SliderFactory fdr,
-      SliderFactory minFC, SliderFactory avgReads, SliderFactory dispersion) {
-    super(deGenes, fdr, minFC, avgReads, dispersion);
+      SliderFactory minFC, SliderFactory avgReads, SliderFactory dispersion, String title,
+      String infoText, String link) {
+    super(deGenes, fdr, minFC, avgReads, dispersion, title, infoText, link);
 
     button = new Button("Compute Power Curve");
     addComponent(button);
@@ -39,17 +37,17 @@ public class RNASeqEstimationView extends ARNASeqPrepView {
         double lambda0 = avgReadCountSlider.getValue();
 
         if (useTestData()) {
-          v.sampleSizeWithData(getProject(), m, m1, f, getTestDataSet(), EstimationMode.TCGA);
+          v.sampleSizeWithData(getNewSampleCode(), m, m1, f, getTestDataSet(), EstimationMode.TCGA);
         } else {
-          v.sampleSize(getProject(), m, m1, phi0, f, lambda0);
+          v.sampleSize(getNewSampleCode(), m, m1, phi0, f, lambda0);
         }
       }
     });
   }
-  
+
   @Override
   public Map<String, String> getProps() {
-    Map<String,String> res = super.getProps();
+    Map<String, String> res = super.getProps();
     res.put("Q_SECONDARY_NAME", "Sample Size Estimation");
     return res;
   }

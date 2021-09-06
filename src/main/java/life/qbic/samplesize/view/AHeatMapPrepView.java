@@ -14,8 +14,8 @@ public abstract class AHeatMapPrepView extends APowerView {
   private RController R;
   protected ProgressBar spinner;
   
-  public AHeatMapPrepView(RController R) {
-    super();
+  public AHeatMapPrepView(RController R, String title, String infoText, String link) {
+    super(title, infoText, link);
     this.R = R;
     spinner = new ProgressBar();
     spinner.setIndeterminate(true);

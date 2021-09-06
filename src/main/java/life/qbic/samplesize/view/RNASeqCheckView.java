@@ -2,7 +2,6 @@ package life.qbic.samplesize.view;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import com.vaadin.data.Property.ValueChangeEvent;
@@ -19,6 +18,11 @@ import life.qbic.samplesize.model.SliderFactory;
 import life.qbic.xml.properties.Property;
 import life.qbic.xml.properties.PropertyType;
 
+/**
+ * 
+ * @author afriedrich
+ *
+ */
 public class RNASeqCheckView extends ARNASeqPrepView {
 
   private static final Logger logger = LogManager.getLogger(RNASeqCheckView.class);
@@ -27,8 +31,9 @@ public class RNASeqCheckView extends ARNASeqPrepView {
   private ComboBox factors;
 
   public RNASeqCheckView(VMConnection v, SliderFactory deGenes, SliderFactory fdr,
-      SliderFactory minFC, SliderFactory avgReads, SliderFactory dispersion) {
-    super(deGenes, fdr, minFC, avgReads, dispersion);
+      SliderFactory minFC, SliderFactory avgReads, SliderFactory dispersion, String title,
+      String infoText, String link) {
+    super(deGenes, fdr, minFC, avgReads, dispersion, title, infoText, link);
 
     button = new Button("Estimation based on existing samples.");
     button.setEnabled(false);
@@ -78,10 +83,10 @@ public class RNASeqCheckView extends ARNASeqPrepView {
         int sampleSize = getMinSampleSizeOfFactor();
 
         if (useTestData()) {
-          v.powerWithData(getProject(), m, m1, sampleSize, f, getTestDataSet(),
+          v.powerWithData(getNewSampleCode(), m, m1, sampleSize, f, getTestDataSet(),
               EstimationMode.TCGA);
         } else {
-          v.power(getProject(), m, m1, sampleSize, phi0, f);
+          v.power(getNewSampleCode(), m, m1, sampleSize, phi0, f);
         }
       }
     });
@@ -125,7 +130,9 @@ public class RNASeqCheckView extends ARNASeqPrepView {
   public void setDesigns(Map<String, List<Integer>> sampleSizesOfFactorLevels) {
     this.factorToLevelSize = sampleSizesOfFactorLevels;
     factors.removeAllItems();
-    factors.addItems(sampleSizesOfFactorLevels.keySet());
+    if (!sampleSizesOfFactorLevels.isEmpty()) {
+      factors.addItems(sampleSizesOfFactorLevels.keySet());
+    }
   }
 
 }

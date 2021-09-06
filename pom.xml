@@ -13,7 +13,7 @@
 		<vaadin.plugin.version>7.7.17</vaadin.plugin.version>
 	</properties>
 	<artifactId>samplesize-portlet</artifactId>
-	<version>0.9.0-SNAPSHOT</version>
+	<version>0.10.0-SNAPSHOT</version>
 	<name>Sample Size Estimation Portlet</name>
 	<url>http://github.com/qbicsoftware/samplesize-portlet</url>
 	<description>sample size estimation for differential abundance analysis</description>

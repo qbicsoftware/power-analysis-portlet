@@ -46,10 +46,15 @@ public class SamplesizePortlet extends QBiCPortletUI {
     OpenBisClient openbis = null;
     try {
       logger.debug("trying to connect to openbis");
-      openbis = new OpenBisClient(config.getDataSourceUser(), config.getDataSourcePassword(),
-          config.getDataSourceUrl());
+      final String baseURL = config.getDataSourceUrl();
+      final String apiURL = baseURL + "/openbis/openbis";
+
+      openbis =
+          new OpenBisClient(config.getDataSourceUser(), config.getDataSourcePassword(), apiURL);
       openbis.login();
     } catch (Exception e) {
+      System.out.println(e.getMessage());
+      System.out.println(e.getCause());
       success = false;
       logger.error("User \"" + user
           + "\" could not connect to openBIS and has been informed of this.");
