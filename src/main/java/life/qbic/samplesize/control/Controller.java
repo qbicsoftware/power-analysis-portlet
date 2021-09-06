@@ -43,6 +43,8 @@ import life.qbic.datamodel.samples.SampleType;
 import life.qbic.openbis.openbisclient.OpenBisClient;
 import life.qbic.portal.Styles;
 import life.qbic.portal.utils.ConfigurationManager;
+import life.qbic.samplesize.model.RNACountData;
+import life.qbic.samplesize.model.SampleTypesInfo;
 import life.qbic.samplesize.model.SliderFactory;
 import life.qbic.samplesize.view.APowerView;
 import life.qbic.samplesize.view.MicroarrayCheckView;
@@ -82,6 +84,7 @@ public class Controller {
   private OpenBisClient openbis;
   private VerticalLayout mainLayout;
   final String POWER_SAMPLE_TYPE = "Q_POWER_ESTIMATION_RUN";
+  final String RNASEQ_COUNT_SAMPLE_TYPE = "Q_WF_NGS_RNA_EXPRESSION_ANALYSIS_RUN";
 
   private String newSampleCode;
 
@@ -118,6 +121,7 @@ public class Controller {
         projectIDs.add(p.getIdentifier().getIdentifier());
       }
     }
+    // new Statistics(openbis, projectIDs);
 
     VMConnection vm = new VMConnection(
         config.getSampleSizeVMUser() + "@" + config.getEpitopeAndSampleSizeVMHost(),
@@ -126,6 +130,23 @@ public class Controller {
         config.getRServeUser(), config.getRServePassword());
 
     initView(vm, R, projectIDs);
+  }
+
+  /**
+   * Finds the the matching strings in the list, e.g. sample codes in file names
+   * 
+   * @param list The list of strings to check
+   * @param substring The regular expression to use
+   * @return List of matching Strings
+   */
+  static List<String> getMatchingStrings(List<String> list, String substring) {
+    List<String> res = new ArrayList<String>();
+    for (String s : list) {
+      if (s.contains(substring)) {
+        res.add(s);
+      }
+    }
+    return res;
   }
 
   private void initView(VMConnection vm, RController R, List<String> projectIDs) {
@@ -187,6 +208,7 @@ public class Controller {
           space = projectID.split("/")[1];
           project = projectID.split("/")[2];
           infoExpID = ExperimentCodeFunctions.getInfoExperimentID(space, project);
+
           List<Sample> allSamples = openbis.getSamplesOfProject(projectID);
           Map<String, List<Sample>> samplesByType = new HashMap<>();
           for (Sample s : allSamples) {
@@ -200,7 +222,11 @@ public class Controller {
           }
           Map<String, List<Integer>> sampleSizesOfFactorLevels =
               getSampleSizesForFactors(infoExpID, samplesByType);
-
+          
+         List<RNACountData> pilotData =
+              preparePilotDataInfo(samplesByType.get(RNASEQ_COUNT_SAMPLE_TYPE));
+          System.out.println("pilotdata");
+          
           List<Sample> powerSamples = samplesByType.get(POWER_SAMPLE_TYPE);
           if (powerSamples == null) {
             powerSamples = new ArrayList<>();
@@ -210,20 +236,21 @@ public class Controller {
           String newSampleCode = newPowerSampleCode(powerSamples);
 
           maEstView.setProjectContext(projectID, newSampleCode);
-          rnaEstView.setProjectContext(projectID, newSampleCode);
+          rnaEstView.setProjectContext(projectID, newSampleCode, pilotData);
           maCheckView.setProjectContext(projectID, newSampleCode);
-          rnaCheckView.setProjectContext(projectID, newSampleCode);
+          rnaCheckView.setProjectContext(projectID, newSampleCode, pilotData);
           enableDesignBasedViews(!sampleSizesOfFactorLevels.isEmpty());
           maCheckView.setDesigns(sampleSizesOfFactorLevels);
           rnaCheckView.setDesigns(sampleSizesOfFactorLevels);
         }
       }
-
       private void enableDesignBasedViews(boolean hasDesign) {
         tabs.getTab(maCheckView).setEnabled(hasDesign);
         tabs.getTab(rnaCheckView).setEnabled(hasDesign);
       }
+      
     });
+    
     runTable = new Table("Existing Calculations");
     runTable.setVisible(false);
     runTable.setStyleName(Styles.tableTheme);
@@ -243,6 +270,35 @@ public class Controller {
     mainLayout.addComponent(tabs);
   }
 
+  private List<RNACountData> preparePilotDataInfo(Set<Sample> set) {
+    List<RNACountData> res = new ArrayList<>();
+    if (set != null) {
+      for (Sample s : set) {
+        String secName = s.getProperties().get("Q_SECONDARY_NAME");
+        if (secName == null || secName.isEmpty()) {
+          List<String> parentInfo =
+              aggregateParentInfo(new HashSet<>(s.getParents()), new ArrayList<>());
+          res.add(new RNACountData(s.getCode(), String.join(", ", parentInfo)));
+        } else {
+          res.add(new RNACountData(s.getCode(), secName));
+        }
+      }
+    }
+    return res;
+  }
+
+  private List<String> aggregateParentInfo(Set<Sample> parents, List<String> res) {
+    while (res.isEmpty() && !parents.isEmpty()) {
+      Set<Sample> newParents = new HashSet<>();
+      for (Sample s : parents) {
+        newParents.addAll(s.getParents());
+        res.add(s.getProperties().get("Q_SECONDARY_NAME"));
+      }
+      return aggregateParentInfo(newParents, res);
+    }
+    return res;
+  }
+                                      
   protected void showExistingRuns(List<Sample> powerSamples) {
     mapSampleIDsToMatrixImages(powerSamples);
 
@@ -317,13 +373,6 @@ public class Controller {
     subContent.setMargin(true);
     subWindow.setContent(subContent);
 
-    // Image image = new Image("Matrix", resource);
-    // subContent.addComponent(image);
-
-
-    // PopupView popup = new PopupView("Pop it up", image);
-    // subContent.addComponent(popup);
-
     String MIMEType = resource.getMIMEType();
 
     if (MIMEType.endsWith("png")) {
@@ -389,7 +438,6 @@ public class Controller {
 
   private String newPowerSampleCode(List<Sample> samples) {
     int latest = 0;
-
     String prefix = project + "000";
     for (Sample s : samples) {
       if (s.getType().getCode().equals(POWER_SAMPLE_TYPE)) {
@@ -411,30 +459,36 @@ public class Controller {
   }
 
   private String createStatisticsSample(List<Property> xmlProps, Map<String, String> props) {
-    // String qProperties = "";
-    // try {
-    // qProperties = xmlParser.toString(xmlParser.createXMLFromProperties(xmlProps));
-    // } catch (JAXBException e) {
-    // // TODO Auto-generated catch block
-    // e.printStackTrace();
-    // }
-    // openbis.ingest(dss, serviceName, params);
+    XMLParser xmlParser = new XMLParser();
+    String qProperties = "";
+    try {
+      qProperties = xmlParser.toString(xmlParser.createXMLFromProperties(xmlProps));
+    } catch (JAXBException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
     Map<String, Object> params = new HashMap<String, Object>();
     params.put("code", newSampleCode);
-    params.put("type", POWER_SAMPLE_TYPE);
+    params.put("type", POWER_SAMPLE_TYPE); // sample type - e.g. Q_BMI...
 
     params.put("parents",
-        new ArrayList<String>(Arrays.asList('/' + space + '/' + project + "000")));
+        new ArrayList<String>(Arrays.asList('/' + space + '/' + project + "000"))); // these need to
+                                                                                    // be
+                                                                                    // identifiers
+                                                                                    // of the parent
+                                                                                    // samples
+                                                                                    // (including
+                                                                                    // the space)!
+                                                                                    // E.g.
+                                                                                    // /MULTISCALE_HCC/QMSHSENTITY-1
 
     params.put("project", project);
     params.put("space", space);
-    params.put("experiment", project + "_INFO");
+    params.put("experiment", project + "_INFO"); // e.g. the Q_BMI... experiment - the code is
+                                                 // usually built differently than in this example!
 
-    StringBuilder result = new StringBuilder();
-    result.append("Input Files: ");
-
-    // props.put("Q_PROPERTIES", qProperties);
-    // params.put("properties", props);
+    props.put("Q_PROPERTIES", qProperties); // xml properties, not important
+    params.put("properties", props);
 
     openbis.ingest("DSS1", "register-samp", params);
     return newSampleCode;
@@ -539,8 +593,7 @@ public class Controller {
         url = new URL(url.toString().replace(":444", ""));
         System.out.println(url);
         Resource resource = new ExternalResource(url);
-        // Image image = new Image("Image from file", resource);
-        // mainLayout.addComponent(image);
+
         resourcesForSamples.put(dataSetCodeToSampleID.get(dsCode), resource);
       } catch (MalformedURLException e) {
         // TODO Auto-generated catch block

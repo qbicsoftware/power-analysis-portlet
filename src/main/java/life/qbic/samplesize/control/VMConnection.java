@@ -36,17 +36,17 @@ public class VMConnection {
    * 
    */
   private ArrayList<String> getPowerMatrixCommand(int genes, int deGenes, int sampleSize,
-      double fdr, double dispersion) {
+      double avgReads, double dispersion) {
     ArrayList<String> res =
         new ArrayList<>(Arrays.asList(Integer.toString(genes), Integer.toString(deGenes),
-            Integer.toString(sampleSize), Double.toString(fdr), Double.toString(dispersion)));
+            Integer.toString(sampleSize), Double.toString(avgReads), Double.toString(dispersion)));
     return res;
   }
 
   private ArrayList<String> getPowerMatrixWithDataCommand(int genes, int deGenes, int sampleSize,
-      double fdr, String dataset) {
+      String dataset) {
     ArrayList<String> res = new ArrayList<>(Arrays.asList(Integer.toString(genes),
-        Integer.toString(deGenes), Integer.toString(sampleSize), Double.toString(fdr), dataset));
+        Integer.toString(deGenes), Integer.toString(sampleSize), dataset));
     return res;
   }
 
@@ -120,17 +120,15 @@ public class VMConnection {
    * @param genes number of genes
    * @param deGenes number of differentially expressed genes
    * @param sampleSize the number of samples per study group
-   * @param fdr false discovery rate cutoff
    * @param dataset name of the dataset object
    * @param mode either 'tcga' for a dataset from the cancer genome atlas, or 'data' for any other
    *        dataset
    */
-  public void powerWithData(String sampleCode, int genes, int deGenes, int sampleSize, double fdr,
-      String dataset, EstimationMode mode) {
-    List<String> cmd = getMatrixCommandBase(sampleCode);
+  public void powerWithData(String project, int genes, int deGenes, int sampleSize, String dataset, EstimationMode mode) {
+    List<String> cmd = getMatrixCommandBase(project);
     cmd.add("power");
     cmd.add(mode.toString().toLowerCase());
-    cmd.addAll(getPowerMatrixWithDataCommand(genes, deGenes, sampleSize, fdr, dataset));
+    cmd.addAll(getPowerMatrixWithDataCommand(genes, deGenes, sampleSize, dataset));
     runCommand(cmd);
   }
 
@@ -138,15 +136,15 @@ public class VMConnection {
     ProcessBuilderWrapper pbd = null;
     try {
       System.out.println("sending: " + cmd);
-      pbd = new ProcessBuilderWrapper(cmd, false);
+//      pbd = new ProcessBuilderWrapper(cmd, false);
     } catch (Exception e) {
       e.printStackTrace();
     }
-    if (pbd.getStatus() != 0) {
-      System.out.println("Command has terminated with status: " + pbd.getStatus());
-      System.out.println("Error: " + pbd.getErrors());
-      System.out.println("Last command sent: " + cmd);
-    }
+//    if (pbd.getStatus() != 0) {
+//      System.out.println("Command has terminated with status: " + pbd.getStatus());
+//      System.out.println("Error: " + pbd.getErrors());
+//      System.out.println("Last command sent: " + cmd);
+//    }
   }
 
   /**
@@ -165,7 +163,7 @@ public class VMConnection {
     List<String> cmd = getMatrixCommandBase(sampleCode);
     cmd.add("power");
     cmd.add("none");
-    cmd.addAll(getPowerMatrixCommand(genes, deGenes, sampleSize, dispersion, fdr));
+    cmd.addAll(getPowerMatrixCommand(genes, deGenes, sampleSize, dispersion, avgReads));
     runCommand(cmd);
   }
 }

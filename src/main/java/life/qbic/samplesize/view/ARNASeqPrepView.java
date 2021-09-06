@@ -1,19 +1,25 @@
 package life.qbic.samplesize.view;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
 import com.vaadin.data.Property;
+import com.vaadin.ui.Button;
 import com.vaadin.ui.HorizontalLayout;
 import com.vaadin.ui.ListSelect;
 import com.vaadin.ui.OptionGroup;
 import com.vaadin.ui.Table;
 import com.vaadin.ui.VerticalLayout;
+import com.vaadin.ui.Table.Align;
 
+import life.qbic.portal.Styles;
 import life.qbic.samplesize.components.ParameterEstimationComponent;
 import life.qbic.samplesize.components.SliderWithLabel;
 import life.qbic.samplesize.model.Constants;
+import life.qbic.samplesize.model.RNACountData;
 import life.qbic.samplesize.model.SliderFactory;
 
 public abstract class ARNASeqPrepView extends AContainerPrepView {
@@ -92,12 +98,17 @@ public abstract class ARNASeqPrepView extends AContainerPrepView {
     });
 
     pilotData = new Table("Available Pilot Study Data");
-    pilotData.setPageLength(Math.min(10, pilotData.size() + 1));
+    pilotData.setStyleName(Styles.tableTheme);
+    pilotData.addContainerProperty("Run Code", String.class, "");
+    pilotData.addContainerProperty("Run Information", String.class, "");
+    pilotData.setVisible(false);
+
+    optionBox.addComponent(pilotData);
 
     testData = new ListSelect("Available Test Datasets");
     testData.addItems(Constants.TCGA_DATASETS.keySet());
     testData.setVisible(false);
-    addComponent(testData);
+    optionBox.addComponent(testData);
 
     HorizontalLayout sliderBar = new HorizontalLayout();
     sliderBar.setMargin(true);
@@ -133,10 +144,27 @@ public abstract class ARNASeqPrepView extends AContainerPrepView {
     avgReadCountSlider.setEnabled(enable);
     dispersionSlider.setEnabled(enable);
   }
-  
+
+  public void setProjectContext(String projectID, String newSampleCode,
+      List<RNACountData> pilotData) {
+    super.setProjectContext(projectID, newSampleCode);
+    setPilotData(pilotData);
+  }
+
+  public void setPilotData(List<RNACountData> datasets) {
+    pilotData.removeAllItems();
+    for (RNACountData d : datasets) {
+      List<Object> row = new ArrayList<Object>();
+      row.add(d.getSampleCode());
+      row.add(d.getInformation());
+      pilotData.addItem(row.toArray(new Object[row.size()]), d);
+    }
+    pilotData.setPageLength(Math.min(10, pilotData.size() + 1));
+  }
+
   @Override
   public Map<String, String> getProps() {
-    Map<String,String> res = super.getProps();
+    Map<String, String> res = super.getProps();
     res.put("Q_TECHNOLOGY_TYPE", "RNA-Sequencing");
     return res;
   }

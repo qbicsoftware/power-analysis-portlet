@@ -37,9 +37,9 @@ public class RNASeqEstimationView extends ARNASeqPrepView {
         double lambda0 = avgReadCountSlider.getValue();
 
         if (useTestData()) {
-          v.sampleSizeWithData(getNewSampleCode(), m, m1, f, getTestDataSet(), EstimationMode.TCGA);
+          v.sampleSizeWithData(newSampleCode, m, m1, f, getTestDataSet(), EstimationMode.TCGA);
         } else {
-          v.sampleSize(getNewSampleCode(), m, m1, phi0, f, lambda0);
+          v.sampleSize(newSampleCode, m, m1, phi0, f, lambda0);
         }
       }
     });

@@ -19,17 +19,16 @@ import life.qbic.xml.properties.PropertyType;
 public class MicroarrayEstimationView extends AHeatMapPrepView {
 
   SliderWithLabel deGenesSlider;
-  
   public MicroarrayEstimationView(RController R, SliderFactory deGenes, String title, String infoText, String link) {
     super(R, title, infoText, link);
     prepareRCode(R);
 
     deGenesSlider = deGenes.getSliderWithLabel();
-    
+
     addComponent(deGenesSlider);
     button = new Button("Show Power Estimation");
     addComponent(button);
-    
+
     // draw the heatmap
     MicroarrayEstimationView view = this;
     button.addClickListener(new Button.ClickListener() {
@@ -48,26 +47,27 @@ public class MicroarrayEstimationView extends AHeatMapPrepView {
 
         String dataVar = "size_map";
         String computeMatrix = dataVar + " <- ma_samplesize_data(p0=" + p0 + ")";
-        String call = "standard_heatmap(" + dataVar + ", xlab = 'Detectable Log Fold Change', ylab = 'Samples per Group')";
-        R.backgroundEval(computeMatrix,
-            new MicroHeatmapReadyRunnable(view, call,
-                "False discovery/false negative rate if " + deGenesSlider.getValue() + "% genes are DE"));
+        String call = "standard_heatmap(" + dataVar
+            + ", xlab = 'Detectable Log Fold Change', ylab = 'Samples per Group', cexCol = 2, cexRow = 2)";
+        R.backgroundEval(computeMatrix, new MicroHeatmapReadyRunnable(view, call,
+            "False discovery/false negative rate if " + deGenesSlider.getValue() + "% genes are DE",
+            dataVar));
       }
     });
   }
-  
+
   @Override
   public Map<String, String> getProps() {
-    Map<String,String> res = super.getProps();
+    Map<String, String> res = super.getProps();
     res.put("Q_SECONDARY_NAME", "Sample Size Estimation");
     return res;
   }
-  
+
   @Override
   public List<Property> getCurrentProperties() {
     List<Property> xmlProps = super.getCurrentProperties();
-    xmlProps.add(new Property("diff_expr_genes",
-        Double.toString(deGenesSlider.getValue()) + '%', PropertyType.Property));
+    xmlProps.add(new Property("diff_expr_genes", Double.toString(deGenesSlider.getValue()) + '%',
+        PropertyType.Property));
     return xmlProps;
   }
 
@@ -76,7 +76,7 @@ public class MicroarrayEstimationView extends AHeatMapPrepView {
     R.eval("ma_samplesize <- function (n, p0, D, paired = FALSE) {"
         + "samplesize(n = n, p0 = p0, D=D, plot = FALSE, paired = paired, crit.style = c('top percentage'), crit = 1-p0)}");
     R.eval(
-        "ma_samplesize_data <- function (n = seq(5, 50, by = 5), p0, D=c(1,2,3,4), paired = FALSE) {"
+        "ma_samplesize_data <- function (n = seq(5, 50, by = 5), p0, D=c(1,1.3,1.5,1.7,2,3), paired = FALSE) {"
             + "mat <- NULL;" + "for (d in D) { "
             + "mat <- c(mat, ma_samplesize(n = n, p0 = p0, D = d)[,1])};"
             + "mat <- matrix(mat, ncol = length(D));" + "colnames(mat) <- D;"
