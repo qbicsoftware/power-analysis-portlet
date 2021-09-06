@@ -21,8 +21,9 @@ public abstract class AHeatMapPrepView extends APowerView {
     spinner.setIndeterminate(true);
   }
 
-  public void showHeatmap(String call, String caption) {
-    Window graph = R.getGraph(call, 1000, 800);
+  public void showHeatmap(String call, String caption, String resultVar) {
+    Window graph = R.getGraph(call, 1200, 800);
+    System.out.println(R.getReturnString(resultVar));
     graph.setCaption(caption);
     removeComponent(spinner);
     getUI().addWindow(graph);

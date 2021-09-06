@@ -1,6 +1,5 @@
 package life.qbic.samplesize.view;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -39,9 +38,9 @@ public class RNASeqEstimationView extends ARNASeqPrepView {
         double lambda0 = avgReadCountSlider.getValue();
 
         if (useTestData()) {
-          v.sampleSizeWithData(getProject(), m, m1, f, getTestDataSet(), EstimationMode.TCGA);
+          v.sampleSizeWithData(newSampleCode, m, m1, f, getTestDataSet(), EstimationMode.TCGA);
         } else {
-          v.sampleSize(getProject(), m, m1, phi0, f, lambda0);
+          v.sampleSize(newSampleCode, m, m1, phi0, f, lambda0);
         }
       }
     });

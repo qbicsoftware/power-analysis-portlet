@@ -1,96 +1,148 @@
 package life.qbic.portal.portlet;
 
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-//import org.apache.commons.math3.distribution.TDistribution;
-//import org.apache.commons.math3.stat.inference.TTest;
+import ch.systemsx.cisd.openbis.generic.shared.api.v1.dto.Sample;
+import life.qbic.openbis.openbisclient.IOpenBisClient;
 
 public class Statistics {
 
-//  static TTest ttester = new TTest();
-//
-//  private static double CDF(double[] x, int n1, int n2, double[] D, double[] p, double sigma) {
-//
-//    if (D.length == 0) {
-//      return 0;
-//    }
-//    double ncp = -D[0] * Math.sqrt((n1 * n2) / (n1 + n2)) / sigma;
-//    int df = n1 + n2 - 2;
-//    double ret = p[0] * tDist(x, df, ncp) + CDF(x, n1, n2, Arrays.copyOfRange(D, 1, D.length),
-//        Arrays.copyOfRange(p, 1, p.length), sigma);
-//    return ret;
-//  }
-//
-//  private static double paired_CDF(double[] x, int n, double[] D, double[] p, double sigma) {
-//    if (D.length == 0) {
-//      return 0;
-//    }
-//    double ncp = -D[0] * Math.sqrt(n) / sigma;
-//    int df = n - 1;
-//    double ret = p[0] * tDist(x, df, ncp) + paired_CDF(x, n, Arrays.copyOfRange(D, 1, D.length),
-//        Arrays.copyOfRange(p, 1, p.length), sigma);
-//    return ret;
-//  }
-//
-//  private static double tDist(double[] x, int df, double ncp) {
-//    TDistribution t = new TDistribution(df);// TODO ncp?
-//    return t;
-//  }
-//
-//  private static double[] scaleArray(double[] arr, double factor) {
-//    double[] res = new double[arr.length];
-//    for (int i = 0; i < arr.length; i++) {
-//      res[i] = arr[i] * factor;
-//    }
-//    return res;
-//  }
-//
-//  private static void makeNegativeArray(double[] arr) {
-//    for (int i = 0; i < arr.length; i++) {
-//      if (arr[i] > 0) {
-//        arr[i] = -arr[i];
-//      }
-//    }
-//  }
-//
-//  private static double FDR(double[] x, int n1, int n2, double pmix, double[] D0, double[] p0,
-//      double[] D1, double[] p1, double sigma) {
-//    makeNegativeArray(x);
-//    double[] negX = scaleArray(x, -1);
-//    return pmix * (CDF(x, n1, n2, D0, p0, sigma) + 1 - CDF(negX, n1, n2, D0, p0, sigma))
-//        / (CDFmix(x, n1, n2, pmix, D0, p0, D1, p1, sigma) + 1
-//            - CDFmix(negX, n1, n2, pmix, D0, p0, D1, p1, sigma));
-//  }
-//
-//  private static double CDFmix(double[] x, int n1, int n2, double pmix, double[] d0, double[] p0,
-//      double[] d1, double[] p1, double sigma) {
-//    return pmix * CDF(x, n1, n2, d0, p0, sigma) + (1 - pmix) * CDF(x, n1, n2, d1, p1, sigma);
-//  }
-//
-//  private static double lfdr(double[] x, int n1, int n2, double pmix, double[] D0, double[] p0,
-//      double[] D1, double[] p1, double sigma) {
-//    makeNegativeArray(x);
-//    double[] negX = scaleArray(x, -1);
-//    return pmix * (dmt(x, n1, n2, D0, p0, sigma) + dmt(negX, n1, n2, D0, p0, sigma))
-//        / (dmtmix(x, n1, n2, pmix, D0, p0, D1, p1, sigma)
-//            + dmtmix(negX, n1, n2, pmix, D0, p0, D1, p1, sigma));
-//  }
-//
-//
-//  private static double dmtmix(double[] x, int n1, int n2, double pmix, double[] D0, double[] p0,
-//      double[] D1, double[] p1, double sigma) {
-//    return pmix * dmt(x, n1, n2, D0, p0, sigma) + (1 - pmix) * dmt(x, n1, n2, D1, p1, sigma);
-//  }
-//
-//  private static double dmt(double[] x, int n1, int n2, double[] D, double[] p, double sigma) {
-//    if (D.length == 0) {
-//      return 0;
-//    }
-//    int df = n1 + n2 - 2;
-//    double ncp = -D[1] * Math.sqrt((n1 * n2) / (n1 + n2)) / sigma;
-//    double ret = p[1] * tDist(x, df, ncp) + dmt(x, n1, n2, Arrays.copyOfRange(D, 1, D.length),
-//        Arrays.copyOfRange(p, 1, p.length), sigma);
-//    return ret;
-//  }
-}
+  private IOpenBisClient openbis;
+  private List<String> projectIDs;
+  private final Set<String> TECH_TYPES =
+      new HashSet<String>(Arrays.asList("Q_NGS_SINGLE_SAMPLE_RUN", "Q_MS_RUN", "Q_MICROARRAY_RUN",
+          "Q_MHC_LIGAND_EXTRACT", "Q_BMI_GENERIC_IMAGING_RUN"));
+  private final Set<String> BLACKLIST =
+      new HashSet<String>(Arrays.asList("EDDA_EXPERIMENTAL_DESIGN", "TEST_DROPBOXES",
+          "DELETE_THIS_TEST", "ECKH", "CHICKEN_FARM", "TEACHING_DMQB_PROJECT", "CREATE_SPACE_DEMO",
+          "BLA_BLUP", "IMMIGENE_TEST", "LUIS_KUHN_TEST_SPACE", "CONFERENCE_DEMO", "TEST-AND-TEST",
+          "SIMON_TEST_ETL", "QBIC_BENCHMARK_DATASETS", "DEFAULT", "TEST28", "QBIC_ADMINISTRATION",
+          "DELETE_PLS", "IMGAG_ORPHANS", "DAMIEN_MSC", "IVAC_TEST_SPACE", "QBIC_TEACHING",
+          "LUISANDLUIS", "STAHL_TEST_SPACE", "TEST_PLS_DELETE"));
 
+  public Statistics(IOpenBisClient openbis, List<String> projectIDs) {
+    super();
+    this.openbis = openbis;
+    this.projectIDs = projectIDs;
+    printProjectsAndSamplesWithTypes();
+  }
+
+  private void printProjectsAndSamplesWithTypes() {
+//    int numProjects = 0;
+//    Map<String, Integer> projectsPerType = new HashMap<String, Integer>();
+//    Map<String, Integer> samplesPerType = new HashMap<String, Integer>();
+//    int numSamples = 0;
+//
+//    for (String type : TECH_TYPES) {
+//      projectsPerType.put(type, 0);
+//      samplesPerType.put(type, 0);
+//    }
+
+    // int i = 0;
+    // for (String p : projectIDs) {
+    // i++;
+    // if (i % 50 == 0) {
+    // System.out.println(i + " of " + projectIDs.size());
+    // }
+    // String space = p.split("/")[1];
+    // if (!BLACKLIST.contains(space)) {
+    // List<Sample> samples = openbis.getSamplesOfProjectBySearchService(p);
+    // numSamples += samples.size();
+    // Set<String> foundTypes = new HashSet<String>();
+    // for (Sample s : samples) {
+    // String type = s.getSampleTypeCode();
+    // if (TECH_TYPES.contains(type)) {
+    // foundTypes.add(type);
+    // samplesPerType.put(type, samplesPerType.get(type) + 1);
+    // }
+    // }
+    // if (!foundTypes.isEmpty()) {
+    // numProjects++;
+    // }
+    // for (String type : foundTypes) {
+    // projectsPerType.put(type, projectsPerType.get(type) + 1);
+    // }
+    // }
+    // }
+    // System.out.println(numSamples + " samples.");
+    // System.out.println(numProjects + " non-empty projects.");
+    // System.out.println(projectsPerType);
+    // System.out.println(samplesPerType);
+
+    Map<Integer, Set<String>> yearToProjects = new HashMap<>();
+    Map<String, Set<String>> analytesInProject = new HashMap<>();
+
+    // for (Sample s : openbis.listSamplesForProjects(projectIDs)) {
+    // String space = s.getSpaceCode();
+    int i = 0;
+    List<String> spaces = openbis.listSpaces();
+    for (String space : spaces) {
+      i++;
+      if (i % 50 == 0) {
+        System.out.println(i + " of " + (spaces.size() - BLACKLIST.size()));
+      }
+      if (!BLACKLIST.contains(space)) {
+        for (Sample s : openbis.getSamplesofSpace(space)) {
+          String project = s.getExperimentIdentifierOrNull().split("/")[2];
+          String projectID = "/" + space + "/" + project;
+          String type = s.getSampleTypeCode();
+          if (type.equals("Q_TEST_SAMPLE")) {
+            String analyte = s.getProperties().get("Q_SAMPLE_TYPE");
+            if (analytesInProject.containsKey(projectID)) {
+              analytesInProject.get(projectID).add(analyte);
+            } else {
+              analytesInProject.put(projectID, new HashSet<>(Arrays.asList(analyte)));
+            }
+          }
+          Date regDate = s.getRegistrationDetails().getRegistrationDate();
+          int year = Integer.parseInt(new SimpleDateFormat("yyyy").format(regDate));
+          if (yearToProjects.containsKey(year)) {
+            yearToProjects.get(year).add(projectID);
+          } else {
+            yearToProjects.put(year, new HashSet<>(Arrays.asList(projectID)));
+          }
+        }
+      }
+    }
+
+    List<Integer> years = new ArrayList<>(yearToProjects.keySet());
+    Collections.sort(years);
+
+    for (int year : years) {
+      System.out.println(year);
+      List<String> projects = new ArrayList<>(yearToProjects.get(year));
+      Collections.sort(projects);
+      for (String project : projects) {
+        System.out.println(project + "\t" + analytesInProject.get(project));
+      }
+      System.out.println("---");
+    }
+
+    //
+    // Map<String, Integer> samplesPerMonth = new HashMap<>();
+    // for (Sample s : openbis.listSamplesForProjects(projectIDs)) {
+    // String space = s.getSpaceCode();
+    // if (!BLACKLIST.contains(space)) {
+    // Date regDate = s.getRegistrationDetails().getRegistrationDate();
+    // String date = new SimpleDateFormat("yyyy-MM-dd").format(regDate);
+    // if (samplesPerMonth.containsKey(date)) {
+    // samplesPerMonth.put(date, samplesPerMonth.get(date) + 1);
+    // } else {
+    // samplesPerMonth.put(date, 1);
+    // }
+    // }
+    // }
+    // System.out.println(samplesPerMonth);
+  }
+
+}

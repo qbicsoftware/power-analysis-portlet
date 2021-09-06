@@ -23,7 +23,6 @@ import com.vaadin.data.Property.ValueChangeListener;
 import com.vaadin.server.ExternalResource;
 import com.vaadin.server.FontAwesome;
 import com.vaadin.server.Resource;
-import com.vaadin.server.Sizeable.Unit;
 import com.vaadin.shared.ui.combobox.FilteringMode;
 import com.vaadin.ui.ComboBox;
 import com.vaadin.ui.Image;
@@ -32,7 +31,6 @@ import com.vaadin.ui.Table;
 import com.vaadin.ui.UI;
 import com.vaadin.ui.VerticalLayout;
 import com.vaadin.ui.Window;
-import com.vaadin.ui.themes.ValoTheme;
 import com.vaadin.ui.Button;
 import com.vaadin.ui.Button.ClickEvent;
 import com.vaadin.ui.Button.ClickListener;
@@ -45,9 +43,12 @@ import ch.systemsx.cisd.openbis.generic.shared.api.v1.dto.Project;
 import ch.systemsx.cisd.openbis.generic.shared.api.v1.dto.Sample;
 import ch.systemsx.cisd.openbis.plugin.query.shared.api.v1.dto.QueryTableModel;
 import life.qbic.datamodel.identifiers.ExperimentCodeFunctions;
+import life.qbic.datamodel.samples.SampleType;
 import life.qbic.openbis.openbisclient.OpenBisClient;
 import life.qbic.portal.Styles;
 import life.qbic.portal.utils.ConfigurationManager;
+import life.qbic.samplesize.model.RNACountData;
+import life.qbic.samplesize.model.SampleTypesInfo;
 import life.qbic.samplesize.model.SliderFactory;
 import life.qbic.samplesize.view.APowerView;
 import life.qbic.samplesize.view.MicroarrayCheckView;
@@ -66,6 +67,7 @@ public class Controller {
   private OpenBisClient openbis;
   private VerticalLayout mainLayout;
   final String POWER_SAMPLE_TYPE = "Q_POWER_ESTIMATION_RUN";
+  final String RNASEQ_COUNT_SAMPLE_TYPE = "Q_WF_NGS_RNA_EXPRESSION_ANALYSIS_RUN";
 
   private String newSampleCode;
 
@@ -98,6 +100,7 @@ public class Controller {
         projectIDs.add(p.getIdentifier());
       }
     }
+    // new Statistics(openbis, projectIDs);
 
     VMConnection vm = new VMConnection(
         config.getSampleSizeVMUser() + "@" + config.getEpitopeAndSampleSizeVMHost(),
@@ -107,6 +110,23 @@ public class Controller {
 
     initView(vm, R, projectIDs);
 
+  }
+
+  /**
+   * Finds the the matching strings in the list, e.g. sample codes in file names
+   * 
+   * @param list The list of strings to check
+   * @param substring The regular expression to use
+   * @return List of matching Strings
+   */
+  static List<String> getMatchingStrings(List<String> list, String substring) {
+    List<String> res = new ArrayList<String>();
+    for (String s : list) {
+      if (s.contains(substring)) {
+        res.add(s);
+      }
+    }
+    return res;
   }
 
   private void initView(VMConnection vm, RController R, List<String> projectIDs) {
@@ -157,21 +177,56 @@ public class Controller {
           project = projectID.split("/")[2];
           infoExpID = ExperimentCodeFunctions.getInfoExperimentID(space, project);
 
-          Map<String, List<Integer>> sampleSizesOfFactorLevels =
-              getSampleSizesForFactors(infoExpID);
+          // List<String> fileNames = getFilenamesOfProject(projectID);
+          //
+          // getFactors(infoExpID);
+          // mapExperimentalProperties(projectID, fileNames);
 
-          List<Sample> samples = openbis.getSamplesOfProjectBySearchService(projectID);
 
-          showExistingRuns(samples);
+          // List<Sample> samples = openbis.getSamplesOfProjectBySearchService(projectID);
+          List<Sample> samples =
+              openbis.getSamplesWithParentsAndChildrenOfProjectBySearchService(projectID);
+          System.out.println(samples.size() + " samples");
+          SampleTypesInfo sampleInfo = sortBySampleTypes(samples);
+          System.out.println("got infos");
+          Map<String, Set<Sample>> samplesByType = sampleInfo.getSamplesByType();
+          System.out.println("by type");
+          Map<String, Map<String, Set<String>>> sampleSizesOfFactorLevels =
+              getSampleSizesForFactors(infoExpID, sampleInfo.getCodesByType());
+          System.out.println("factor stuff");
+          showExistingRuns(samplesByType.get(POWER_SAMPLE_TYPE));
+          System.out.println("existing runs");
+          List<RNACountData> pilotData =
+              preparePilotDataInfo(samplesByType.get(RNASEQ_COUNT_SAMPLE_TYPE));
+          System.out.println("pilotdata");
           String newSampleCode = newPowerSampleCode(samples);
 
           maEstView.setProjectContext(projectID, newSampleCode);
-          rnaEstView.setProjectContext(projectID, newSampleCode);
+          rnaEstView.setProjectContext(projectID, newSampleCode, pilotData);
           maCheckView.setProjectContext(projectID, newSampleCode);
-          rnaCheckView.setProjectContext(projectID, newSampleCode);
+          rnaCheckView.setProjectContext(projectID, newSampleCode, pilotData);
           maCheckView.setDesigns(sampleSizesOfFactorLevels);
           rnaCheckView.setDesigns(sampleSizesOfFactorLevels);
         }
+      }
+
+      private SampleTypesInfo sortBySampleTypes(List<Sample> samples) {
+        Map<String, Set<Sample>> sampleMap = new HashMap<>();
+        Map<String, Set<String>> codeMap = new HashMap<>();
+        for (Sample s : samples) {
+          String type = s.getSampleTypeCode();
+          String code = s.getCode();
+          if (sampleMap.containsKey(type)) {
+            sampleMap.get(type).add(s);
+            codeMap.get(type).add(code);
+          } else {
+            Set<Sample> sampleList = new HashSet<>(Arrays.asList(s));
+            Set<String> codeList = new HashSet<>(Arrays.asList(code));
+            sampleMap.put(type, sampleList);
+            codeMap.put(type, codeList);
+          }
+        }
+        return new SampleTypesInfo(sampleMap, codeMap);
       }
     });
     runTable = new Table("Existing Calculations");
@@ -188,15 +243,47 @@ public class Controller {
     runTable.addContainerProperty("Date", Date.class, null);
 
     mainLayout.addComponent(projectBox);
+
     mainLayout.addComponent(runTable);
     mainLayout.addComponent(tabs);
   }
 
-  protected void showExistingRuns(List<Sample> samples) {
+  private List<RNACountData> preparePilotDataInfo(Set<Sample> set) {
+    List<RNACountData> res = new ArrayList<>();
+    if (set != null) {
+      for (Sample s : set) {
+        String secName = s.getProperties().get("Q_SECONDARY_NAME");
+        if (secName == null || secName.isEmpty()) {
+          List<String> parentInfo =
+              aggregateParentInfo(new HashSet<>(s.getParents()), new ArrayList<>());
+          res.add(new RNACountData(s.getCode(), String.join(", ", parentInfo)));
+        } else {
+          res.add(new RNACountData(s.getCode(), secName));
+        }
+      }
+    }
+    return res;
+  }
+
+  private List<String> aggregateParentInfo(Set<Sample> parents, List<String> res) {
+    while (res.isEmpty() && !parents.isEmpty()) {
+      Set<Sample> newParents = new HashSet<>();
+      for (Sample s : parents) {
+        newParents.addAll(s.getParents());
+        res.add(s.getProperties().get("Q_SECONDARY_NAME"));
+      }
+      return aggregateParentInfo(newParents, res);
+    }
+    return res;
+  }
+
+  protected void showExistingRuns(Set<Sample> set) {
+    if (set == null)
+      return;
     List<String> relevantSampleIDs = new ArrayList<>();
 
     runTable.removeAllItems();
-    for (Sample s : samples) {
+    for (Sample s : set) {
       if (s.getSampleTypeCode().equals(POWER_SAMPLE_TYPE)) {
         relevantSampleIDs.add(s.getIdentifier());
 
@@ -256,26 +343,8 @@ public class Controller {
     subContent.setMargin(true);
     subWindow.setContent(subContent);
 
-    Image image = new Image("Matrix", resource);
+    Image image = new Image("", resource);
     subContent.addComponent(image);
-    // PopupView popup = new PopupView("Pop it up", image);
-    // subContent.addComponent(popup);
-
-    // if (dssPath.endsWith(".png")) {
-    // Image image = new Image("DSS image", resource);
-    // mainLayout.addComponent(image);
-    // } else if (dssPath.endsWith(".pdf")) {
-    // Window window = new Window();
-    // window.setWidth("90%");
-    // window.setHeight("90%");
-    // BrowserFrame e = new BrowserFrame("PDF File", resource);
-    // e.setWidth("100%");
-    // e.setHeight("100%");
-    // window.setContent(e);
-    // window.center();
-    // window.setModal(true);
-    // UI.getCurrent().addWindow(window);
-    // }
 
     Table params = new Table("Parameters");
     params.setStyleName(Styles.tableTheme);
@@ -323,7 +392,6 @@ public class Controller {
 
   private String newPowerSampleCode(List<Sample> samples) {
     int latest = 0;
-    String prefix = samples.get(0).getCode().split("-")[0];
     for (Sample s : samples) {
       if (s.getSampleTypeCode().equals(POWER_SAMPLE_TYPE)) {
         String suffix = s.getCode().split("-")[1];
@@ -332,7 +400,7 @@ public class Controller {
       }
     }
     String suffix = Integer.toString(latest + 1);
-    newSampleCode = prefix + "-" + suffix;
+    newSampleCode = project + "-" + suffix;
     return newSampleCode;
   }
 
@@ -352,31 +420,80 @@ public class Controller {
       // TODO Auto-generated catch block
       e.printStackTrace();
     }
-    // openbis.ingest(dss, serviceName, params);
+    // (make sure space, project, experiment and parent sample(s) exist, if applicable!)
     Map<String, Object> params = new HashMap<String, Object>();
     params.put("code", newSampleCode);
-    params.put("type", POWER_SAMPLE_TYPE);
+    params.put("type", POWER_SAMPLE_TYPE); // sample type - e.g. Q_BMI...
 
     params.put("parents",
-        new ArrayList<String>(Arrays.asList('/' + space + '/' + project + "000")));
+        new ArrayList<String>(Arrays.asList('/' + space + '/' + project + "000"))); // these need to
+                                                                                    // be
+                                                                                    // identifiers
+                                                                                    // of the parent
+                                                                                    // samples
+                                                                                    // (including
+                                                                                    // the space)!
+                                                                                    // E.g.
+                                                                                    // /MULTISCALE_HCC/QMSHSENTITY-1
 
     params.put("project", project);
     params.put("space", space);
-    params.put("experiment", project + "_INFO");
+    params.put("experiment", project + "_INFO"); // e.g. the Q_BMI... experiment - the code is
+                                                 // usually built differently than in this example!
 
-    StringBuilder result = new StringBuilder();
-    result.append("Input Files: ");
-
-    props.put("Q_PROPERTIES", qProperties);
+    props.put("Q_PROPERTIES", qProperties); // xml properties, not important
     params.put("properties", props);
 
     openbis.ingest("DSS1", "register-samp", params);
     return newSampleCode;
   }
 
-  private Map<String, List<Integer>> getSampleSizesForFactors(String infoExp) {
+  /**
+   * finds sample sizes of top tier sample type of a factor
+   * 
+   * @param infoExp
+   * @param codesByType
+   * @return
+   */
+  private Map<String, Map<String, Set<String>>> getSampleSizesForFactors(String infoExp,
+      Map<String, Set<String>> codesByType) {
+
+    List<SampleType> factorSampleTypes =
+        new ArrayList<SampleType>(Arrays.asList(SampleType.Q_BIOLOGICAL_ENTITY,
+            SampleType.Q_BIOLOGICAL_SAMPLE, SampleType.Q_TEST_SAMPLE));
+
+    Map<String, Map<String, Set<String>>> factors = getExperimentalDesign(infoExp);
+    Map<String, Map<String, Set<String>>> slimFactors = new HashMap<>();
+    for (SampleType tier : factorSampleTypes) {
+      Set<String> currentCodes = codesByType.get(tier.toString());
+      for (String label : factors.keySet()) {
+        // if label is found, factor was filled in on higher tier of the experimental design
+        if (!slimFactors.containsKey(label)) {
+          Map<String, Set<String>> levels = factors.get(label);
+          Map<String, Set<String>> slimLevels = new HashMap<>();
+          for (String level : levels.keySet()) {
+            Set<String> codesOnFactorLevel = new HashSet<>();
+            for (String code : levels.get(level)) {
+              if (currentCodes.contains(code)) {
+                codesOnFactorLevel.add(code);
+              }
+            }
+            // empty if factor starts on subsequent hierarchy tier (e.g. not a patient factor)
+            if (!codesOnFactorLevel.isEmpty()) {
+              slimLevels.put(level, codesOnFactorLevel);
+            }
+          }
+          if (!slimLevels.isEmpty()) {
+            slimFactors.put(label, slimLevels);
+          }
+        }
+      }
+    }
+    return slimFactors;
+  }
+
+  private Map<String, Map<String, Set<String>>> getExperimentalDesign(String infoExp) {
     List<Experiment> exps = openbis.getExperimentById2(infoExp);
-    Map<String, List<Integer>> res = new HashMap<>();
     if (exps.isEmpty()) {
       logger.error("could not find info experiment" + infoExp);
     } else {
@@ -387,14 +504,17 @@ public class Controller {
         expDesign =
             parser.parseXMLString(designExperiment.getProperties().get("Q_EXPERIMENTAL_SETUP"));
         logger.debug("setting exp design: " + expDesign);
-        res = parser.getSampleSizesOfFactorLevels(expDesign);
-      } catch (JAXBException e) {
+        return parser.getSamplesPerLevelForFactors(expDesign);
+      } catch (
+
+      JAXBException e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
       }
     }
-    return res;
+    return null;
   }
+
 
   public void mapSampleIDsToMatrixImages(List<String> sampleIDs) {
     resourcesForSamples = new HashMap<>();
@@ -406,8 +526,6 @@ public class Controller {
     for (DataSet ds : datasets) {
       String dsCode = ds.getCode();
       dsCodes.add(dsCode);
-      System.out.println(ds);
-      System.out.println(ds.getSampleIdentifierOrNull());
       dataSetCodeToSampleID.put(dsCode, ds.getSampleIdentifierOrNull());
     }
     params.put("codes", dsCodes);
@@ -420,8 +538,7 @@ public class Controller {
       try {
         URL url = openbis.getDataStoreDownloadURLLessGeneric(dsCode, dssPath);
         Resource resource = new ExternalResource(url);
-        // Image image = new Image("Image from file", resource);
-        // mainLayout.addComponent(image);
+
         resourcesForSamples.put(dataSetCodeToSampleID.get(dsCode), resource);
       } catch (MalformedURLException e) {
         // TODO Auto-generated catch block
