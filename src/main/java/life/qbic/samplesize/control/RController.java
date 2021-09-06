@@ -10,16 +10,16 @@ public class RController {
   private RContainer R;
 
   public RController(String host, String port, String user, String pwd) {
-    if (host != null) {
-      remoteLogin(host, Integer.parseInt(port), user, pwd);
-    } else {
-      this.R = new RContainer();
-    }
-    R.eval("library(heatmap3)");
-    R.eval("standard_heatmap <- function (mat, main='', xlab='', ylab='', cexRow = 1, cexCol = 1) {"
-        + "heatmap3(mat, Colv = NA, Rowv = NA, xlab = xlab, ylab = ylab, "
-        + "scale = 'n', col = matlab::jet.colors(1000), cexCol = cexCol, "
-        + "cexRow = cexRow, lasCol = 1, lasRow = 1, main = main)}");
+//    if (host != null) {
+//      remoteLogin(host, Integer.parseInt(port), user, pwd);
+//    } else {
+//      this.R = new RContainer();
+//    }
+//    R.eval("library(heatmap3)");
+//    R.eval("standard_heatmap <- function (mat, main='', xlab='', ylab='', cexRow = 1, cexCol = 1) {"
+//        + "heatmap3(mat, Colv = NA, Rowv = NA, xlab = xlab, ylab = ylab, "
+//        + "scale = 'n', col = matlab::jet.colors(1000), cexCol = cexCol, "
+//        + "cexRow = cexRow, lasCol = 1, lasRow = 1, main = main)}");
   }
   
   public String getReturnString(String call) {

@@ -156,10 +156,10 @@ public class VMConnection {
    * @param sampleSize the number of samples per study group
    * @param dispersion dispersion of the negative binomial distribution a.k.a. squared biological
    *        coefficient of variance
-   * @param fdr false discovery rate cutoff
+   * @param avgReads average read count
    */
   public void power(String sampleCode, int genes, int deGenes, int sampleSize, double dispersion,
-      double fdr) {
+      double avgReads) {
     List<String> cmd = getMatrixCommandBase(sampleCode);
     cmd.add("power");
     cmd.add("none");

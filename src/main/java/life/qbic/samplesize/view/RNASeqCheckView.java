@@ -33,7 +33,6 @@ public class RNASeqCheckView extends ARNASeqPrepView {
 
   private static final Logger logger = LogManager.getLogger(RNASeqCheckView.class);
 
-  private Map<String, List<Integer>> factorToLevelSize;
   private ComboBox factors;
   private Map<String, Map<String, Set<String>>> sampleSizesOfFactorLevels;
   private Map<String, Set<String>> selectedLevels;
@@ -42,6 +41,8 @@ public class RNASeqCheckView extends ARNASeqPrepView {
       SliderFactory minFC, SliderFactory avgReads, SliderFactory dispersion, String title,
       String infoText, String link) {
     super(deGenes, fdr, minFC, avgReads, dispersion, title, infoText, link);
+    
+    fdrSlider.setVisible(false);
 
     factors = new ComboBox("Study Factor");
     
@@ -93,10 +94,9 @@ public class RNASeqCheckView extends ARNASeqPrepView {
         m = m / gcd;
         m1 = m1 / gcd;
 
-//        double f = fdrSlider.getValue();
         double avgReads = avgReadCountSlider.getValue();
+        // dispersion
         double phi0 = dispersionSlider.getValue();
-        // double fc = minFoldChangeSlider.getValue();
 
         int sampleSize = getMinSampleSizeOfFactor();
 

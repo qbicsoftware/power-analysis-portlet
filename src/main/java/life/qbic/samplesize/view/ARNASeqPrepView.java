@@ -2,18 +2,15 @@ package life.qbic.samplesize.view;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
 import com.vaadin.data.Property;
-import com.vaadin.ui.Button;
 import com.vaadin.ui.HorizontalLayout;
 import com.vaadin.ui.ListSelect;
 import com.vaadin.ui.OptionGroup;
 import com.vaadin.ui.Table;
 import com.vaadin.ui.VerticalLayout;
-import com.vaadin.ui.Table.Align;
 
 import life.qbic.portal.Styles;
 import life.qbic.samplesize.components.ParameterEstimationComponent;

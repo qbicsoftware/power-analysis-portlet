@@ -28,10 +28,10 @@ public abstract class APowerView extends VerticalLayout {
 
   private void addInfoPanel(String title, String infoText, String url) {
     Panel infoPanel = new Panel(title);
-    infoPanel.setWidth(450, Unit.PIXELS);
+    infoPanel.setWidth(500, Unit.PIXELS);
 
     final VerticalLayout contentLayout = new VerticalLayout();
-    contentLayout.setWidth(450, Unit.PIXELS);
+    contentLayout.setWidth(500, Unit.PIXELS);
     contentLayout.setSpacing(false);
     contentLayout.addComponent(new Label(infoText, ContentMode.HTML));
 

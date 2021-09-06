@@ -11,8 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import ch.systemsx.cisd.openbis.generic.shared.api.v1.dto.Sample;
+import ch.ethz.sis.openbis.generic.asapi.v3.dto.sample.Sample;
 import life.qbic.openbis.openbisclient.IOpenBisClient;
 
 public class Statistics {
@@ -93,9 +92,9 @@ public class Statistics {
       }
       if (!BLACKLIST.contains(space)) {
         for (Sample s : openbis.getSamplesofSpace(space)) {
-          String project = s.getExperimentIdentifierOrNull().split("/")[2];
+          String project = s.getProject().getCode();
           String projectID = "/" + space + "/" + project;
-          String type = s.getSampleTypeCode();
+          String type = s.getType().getCode();
           if (type.equals("Q_TEST_SAMPLE")) {
             String analyte = s.getProperties().get("Q_SAMPLE_TYPE");
             if (analytesInProject.containsKey(projectID)) {
@@ -104,7 +103,7 @@ public class Statistics {
               analytesInProject.put(projectID, new HashSet<>(Arrays.asList(analyte)));
             }
           }
-          Date regDate = s.getRegistrationDetails().getRegistrationDate();
+          Date regDate = s.getRegistrationDate();
           int year = Integer.parseInt(new SimpleDateFormat("yyyy").format(regDate));
           if (yearToProjects.containsKey(year)) {
             yearToProjects.get(year).add(projectID);

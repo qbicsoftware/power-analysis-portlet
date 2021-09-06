@@ -2,8 +2,7 @@ package life.qbic.samplesize.model;
 
 import java.util.Map;
 import java.util.Set;
-
-import ch.systemsx.cisd.openbis.generic.shared.api.v1.dto.Sample;
+import ch.ethz.sis.openbis.generic.asapi.v3.dto.sample.Sample;
 
 public class SampleTypesInfo {
 

@@ -44,7 +44,6 @@ import life.qbic.openbis.openbisclient.OpenBisClient;
 import life.qbic.portal.Styles;
 import life.qbic.portal.utils.ConfigurationManager;
 import life.qbic.samplesize.model.RNACountData;
-import life.qbic.samplesize.model.SampleTypesInfo;
 import life.qbic.samplesize.model.SliderFactory;
 import life.qbic.samplesize.view.APowerView;
 import life.qbic.samplesize.view.MicroarrayCheckView;
@@ -52,6 +51,7 @@ import life.qbic.samplesize.view.MicroarrayEstimationView;
 import life.qbic.samplesize.view.RNASeqCheckView;
 import life.qbic.samplesize.view.RNASeqEstimationView;
 import life.qbic.xml.manager.StudyXMLParser;
+import life.qbic.xml.manager.XMLParser;
 import life.qbic.xml.properties.Property;
 import life.qbic.xml.study.Qexperiment;
 
@@ -61,20 +61,28 @@ public class Controller {
 
   private final String microArrayPowerInformation =
       "Predicts false discovery rate (FDR) based on fold change of interest and sample size per group. Based on the "
-          + "R package OCplus by Pawitan et al. (2013)";
+          + "R package <b>OCplus</b> by Pawitan et al. (2013)";
 
   private final String microArrayExperimentalDesignInformation =
       "Predicts the power of an experimental design based on its sample size. False discovery rate (FDR) is shown as "
           + "a function of the detectable log fold change as well as the ratio of non-differentially expressed genes in "
-          + "the data. Based on the R package OCplus by Pawitan et al. (2013)";
+          + "the data. Based on the R package <b>OCplus</b> by Pawitan et al. (2013)";
 
-  private final String RNAPowerInformation = "";
+  private final String RNAPowerInformation =
+      "Estimates the needed sample size for an experimental design. "
+          + "Creates a matrix showing needed sample size to reach different power (sensitivity) levels in order to detect "
+          + "for detecting differential expression of different log fold changes. Needs maximum tolerated false discovery "
+          + "rate (FDR), as well as estimated percentage of differentiall expressed genes as input. Dispersion and "
+          + "the average read count can be set or estimated using values from literature, data from The Cancer Genome Atlas "
+          + "(TCGA) or pilot data, if it is available. Based on the R package <b>RnaSeqSampleSize</b> by Zhao et al. (2018)";
 
-  private final String RNAExperimentalDesignInformation = "Estimates statistical power for a known experimental design. "
-      + "Creates a power matrix showing statistical power as a function of false discovery rate and minimum detectable "
-      + "fold change between groups. Users can select maximum false discovery rate, the estimated ratio of differentially expressed "
-      + "genes.";
-  
+  private final String RNAExperimentalDesignInformation =
+      "Estimates statistical power for a known experimental design. "
+          + "Creates a power matrix showing statistical power as a function of false discovery rate and minimum detectable "
+          + "fold change between groups. Needs the estimated ratio of differentially expressed genes as input. Dispersion and "
+          + "the average read count can be set or estimated using values from literature, data from The Cancer Genome Atlas "
+          + "(TCGA) or pilot data, if it is available. Based on the R package <b>RnaSeqSampleSize</b> by Zhao et al. (2018)";
+
   private final String ocPlus =
       "https://www.bioconductor.org/packages/release/bioc/html/OCplus.html";
 
@@ -166,21 +174,21 @@ public class Controller {
         new SliderFactory("Average dispersion", "phi0", 4, 0.0001, 20, 1, "200px");
 
     RNASeqCheckView rnaCheckView = new RNASeqCheckView(vm, deGenes, fdr, minFC, avgReads,
-        dispersion, "RNASeq Power Estimation based on Experimental Design",
+        dispersion, "RNA-Seq Power Estimation based on Experimental Design",
         RNAExperimentalDesignInformation, rnaseqsamplesize);
     RNASeqEstimationView rnaEstView = new RNASeqEstimationView(vm, deGenes, fdr, minFC, avgReads,
-        dispersion, "RNASeq Power Estimation", RNAPowerInformation, rnaseqsamplesize);
+        dispersion, "RNA-Seq Sample Size Estimation", RNAPowerInformation, rnaseqsamplesize);
     MicroarrayCheckView maCheckView = new MicroarrayCheckView(R, sensitivity,
         "Microarray Power Estimation based on Experimental Design",
         microArrayExperimentalDesignInformation, ocPlus);
     MicroarrayEstimationView maEstView = new MicroarrayEstimationView(R, deGenes,
-        "Microarray Power Estimation", microArrayPowerInformation, ocPlus);
+        "Microarray Sample Size Estimation", microArrayPowerInformation, ocPlus);
 
 
-    tabs.addTab(rnaCheckView, "Exp. Design RNA-Seq");
-    tabs.addTab(rnaEstView, "RNA-Seq");
-    tabs.addTab(maEstView, "Microarrays");
-    tabs.addTab(maCheckView, "Exp. Design Microarrays");
+    tabs.addTab(rnaCheckView, "RNA-Seq Power");
+    tabs.addTab(rnaEstView, "RNA-Seq Sample Size");
+    tabs.addTab(maEstView, "Microarray Sample Size");
+    tabs.addTab(maCheckView, "Microarray Power");
 
 
 
@@ -220,13 +228,15 @@ public class Controller {
               samplesByType.put(type, list);
             }
           }
-          Map<String, List<Integer>> sampleSizesOfFactorLevels =
+          Map<String, Map<String, Set<String>>> sampleSizesOfFactorLevels =
               getSampleSizesForFactors(infoExpID, samplesByType);
-          
-         List<RNACountData> pilotData =
+
+          System.out.println(sampleSizesOfFactorLevels);
+
+          List<RNACountData> pilotData =
               preparePilotDataInfo(samplesByType.get(RNASEQ_COUNT_SAMPLE_TYPE));
           System.out.println("pilotdata");
-          
+
           List<Sample> powerSamples = samplesByType.get(POWER_SAMPLE_TYPE);
           if (powerSamples == null) {
             powerSamples = new ArrayList<>();
@@ -244,13 +254,14 @@ public class Controller {
           rnaCheckView.setDesigns(sampleSizesOfFactorLevels);
         }
       }
+
       private void enableDesignBasedViews(boolean hasDesign) {
         tabs.getTab(maCheckView).setEnabled(hasDesign);
         tabs.getTab(rnaCheckView).setEnabled(hasDesign);
       }
-      
+
     });
-    
+
     runTable = new Table("Existing Calculations");
     runTable.setVisible(false);
     runTable.setStyleName(Styles.tableTheme);
@@ -270,10 +281,10 @@ public class Controller {
     mainLayout.addComponent(tabs);
   }
 
-  private List<RNACountData> preparePilotDataInfo(Set<Sample> set) {
+  private List<RNACountData> preparePilotDataInfo(List<Sample> list) {
     List<RNACountData> res = new ArrayList<>();
-    if (set != null) {
-      for (Sample s : set) {
+    if (list != null) {
+      for (Sample s : list) {
         String secName = s.getProperties().get("Q_SECONDARY_NAME");
         if (secName == null || secName.isEmpty()) {
           List<String> parentInfo =
@@ -298,7 +309,7 @@ public class Controller {
     }
     return res;
   }
-                                      
+
   protected void showExistingRuns(List<Sample> powerSamples) {
     mapSampleIDsToMatrixImages(powerSamples);
 
@@ -494,10 +505,10 @@ public class Controller {
     return newSampleCode;
   }
 
-  private Map<String, List<Integer>> getSampleSizesForFactors(String infoExp,
+  private Map<String, Map<String, Set<String>>> getSampleSizesForFactors(String infoExp,
       Map<String, List<Sample>> samplesByType) {
     Experiment exp = openbis.getExperimentById(infoExp);
-    Map<String, List<Integer>> res = new HashMap<>();
+    Map<String, Map<String, Set<String>>> res = new HashMap<>();
     if (exp == null) {
       logger.error("could not find info experiment" + infoExp);
     } else {
@@ -509,19 +520,19 @@ public class Controller {
         Map<String, Map<String, Set<String>>> sizeMap =
             studyXMLParser.getSamplesPerLevelForFactors(expDesign);
         for (String factor : sizeMap.keySet()) {
-          List<Integer> groupSizes = new ArrayList<>();
+          Map<String, Set<String>> groups = new HashMap<>();
           Map<String, Set<String>> levels = sizeMap.get(factor);
           Set<String> factorSamples = getFactorSampleType(samplesByType, levels);
-          for (Set<String> sampleCodes : levels.values()) {
-            int size = 0;
-            for (String code : sampleCodes) {
+          for (String levelName : levels.keySet()) {
+            Set<String> instances = new HashSet<>();
+            for (String code : levels.get(levelName)) {
               if (factorSamples.contains(code)) {
-                size++;
+                instances.add(code);
               }
             }
-            groupSizes.add(size);
+            groups.put(levelName, instances);
           }
-          res.put(factor, groupSizes);
+          res.put(factor, groups);
         }
       } catch (JAXBException e) {
         // TODO Auto-generated catch block
