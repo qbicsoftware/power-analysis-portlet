@@ -84,10 +84,10 @@ public class Controller {
           + "(TCGA) or pilot data, if it is available. Based on the R package <b>RnaSeqSampleSize</b> by Zhao et al. (2018)";
 
   private final String ocPlus =
-      "https://www.bioconductor.org/packages/release/bioc/html/OCplus.html";
+      "https://doi.org/doi:10.18129/B9.bioc.OCplus";
 
   private final String rnaseqsamplesize =
-      "http://www.bioconductor.org/packages/release/bioc/html/RnaSeqSampleSize.html";
+      "https://doi.org/doi:10.18129/B9.bioc.RnaSeqSampleSize";
 
   private OpenBisClient openbis;
   private VerticalLayout mainLayout;
