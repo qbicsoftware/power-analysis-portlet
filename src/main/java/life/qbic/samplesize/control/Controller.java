@@ -38,6 +38,7 @@ import ch.ethz.sis.openbis.generic.asapi.v3.dto.experiment.Experiment;
 import ch.ethz.sis.openbis.generic.asapi.v3.dto.project.Project;
 import ch.ethz.sis.openbis.generic.asapi.v3.dto.sample.Sample;
 import ch.ethz.sis.openbis.generic.dssapi.v3.dto.datasetfile.DataSetFile;
+import jline.internal.Log;
 import life.qbic.datamodel.identifiers.ExperimentCodeFunctions;
 import life.qbic.datamodel.samples.SampleType;
 import life.qbic.openbis.openbisclient.OpenBisClient;
@@ -83,11 +84,9 @@ public class Controller {
           + "the average read count can be set or estimated using values from literature, data from The Cancer Genome Atlas "
           + "(TCGA) or pilot data, if it is available. Based on the R package <b>RnaSeqSampleSize</b> by Zhao et al. (2018)";
 
-  private final String ocPlus =
-      "https://doi.org/doi:10.18129/B9.bioc.OCplus";
+  private final String ocPlus = "https://doi.org/doi:10.18129/B9.bioc.OCplus";
 
-  private final String rnaseqsamplesize =
-      "https://doi.org/doi:10.18129/B9.bioc.RnaSeqSampleSize";
+  private final String rnaseqsamplesize = "https://doi.org/doi:10.18129/B9.bioc.RnaSeqSampleSize";
 
   private OpenBisClient openbis;
   private VerticalLayout mainLayout;
@@ -106,9 +105,10 @@ public class Controller {
 
   private Table runTable;
 
-  private HashMap<String, Resource> resourcesForSamples;
+  private Map<String, Resource> resourcesForSamples;
 
-  private StudyXMLParser studyXMLParser;
+  private final StudyXMLParser studyXMLParser = new StudyXMLParser();
+  private final XMLParser xmlParser = new XMLParser();
 
   private JAXBElement<Qexperiment> expDesign;
 
@@ -272,7 +272,8 @@ public class Controller {
     runTable.addContainerProperty("Show", Button.class, null);
     runTable.setColumnWidth("Show", 60);
     runTable.setColumnAlignment("Show", Align.CENTER);
-    runTable.addContainerProperty("Created by", String.class, "");
+    runTable.addContainerProperty("Parameters", Button.class, null);
+    runTable.setColumnAlignment("Parameters", Align.CENTER);
     runTable.addContainerProperty("Date", Date.class, null);
 
     mainLayout.addComponent(projectBox);
@@ -361,10 +362,19 @@ public class Controller {
       row.add(download);
       row.add(showResult);
 
-      String user = s.getModifier().getFirstName() + " " + s.getModifier().getLastName();
+      // String user = s.getModifier().getFirstName() + " " + s.getModifier().getLastName();
       Date regDate = s.getRegistrationDate();
+      Button paramButton = new Button();
+      paramButton.setIcon(FontAwesome.CLIPBOARD);
+      paramButton.addClickListener(new Button.ClickListener() {
 
-      row.add(user);
+        @Override
+        public void buttonClick(ClickEvent event) {
+          prepareParamPopup(s);
+        }
+      });
+      row.add(paramButton);
+      // row.add(user);
       row.add(regDate);
 
       runTable.addItem(row.toArray(new Object[row.size()]), s);
@@ -373,6 +383,51 @@ public class Controller {
     runTable.setVisible(runs > 0);
 
     runTable.setPageLength(runs);
+  }
+
+  private void prepareParamPopup(Sample run) {
+    Window subWindow = new Window("Parameters");
+    subWindow.setWidth("800");
+    subWindow.setHeight("1000");
+    VerticalLayout subContent = new VerticalLayout();
+    subContent.setSpacing(true);
+    subContent.setMargin(true);
+    subWindow.setContent(subContent);
+
+    Table paramTable = new Table("Parameters");
+    paramTable.setStyleName(Styles.tableTheme);
+    paramTable.addContainerProperty("Name", String.class, "");
+    paramTable.addContainerProperty("Value", String.class, "");
+    paramTable.setVisible(false);
+
+    String xml = run.getProperties().get("Q_PROPERTIES");
+
+    List<Property> props = new ArrayList<>();
+    try {
+      props = xmlParser.getPropertiesFromXML(xml);
+    } catch (JAXBException e) {
+      Log.warn("Properties can not be displayed for sample" + run.getCode());
+      Log.warn(e.getCause().toString());
+    }
+
+    for (Property p : props) {
+      List<Object> row = new ArrayList<Object>();
+      row.add(p.getLabel());
+      String val = p.getValue();
+      if (p.hasUnit()) {
+        val = val + ' ' + p.getUnit();
+      }
+      row.add(val);
+      paramTable.addItem(row.toArray(new Object[row.size()]), p);
+      paramTable.setVisible(true);
+    }
+    paramTable.setPageLength(props.size());
+    subContent.addComponent(paramTable);
+
+    // Center it in the browser window
+    subWindow.center();
+    // Open it in the UI
+    UI.getCurrent().addWindow(subWindow);
   }
 
   private void preparePopUpView(String sampleCode, Resource resource) {
@@ -392,29 +447,6 @@ public class Controller {
 
       // Image image = new Image("DSS image", resource);
       // mainLayout.addComponent(image);
-
-      Table params = new Table("Parameters");
-      params.setStyleName(Styles.tableTheme);
-      params.addContainerProperty("Name", String.class, "");
-      params.addContainerProperty("Value", String.class, "");
-      params.setVisible(false);
-
-      List<Property> props =
-          studyXMLParser.getFactorsAndPropertiesForSampleCode(expDesign, sampleCode);
-
-      for (Property p : props) {
-        List<Object> row = new ArrayList<Object>();
-        row.add(p.getLabel());
-        String val = p.getValue();
-        if (p.hasUnit()) {
-          val = val + ' ' + p.getUnit();
-        }
-        row.add(val);
-        params.addItem(row.toArray(new Object[row.size()]), p);
-        params.setVisible(true);
-      }
-      params.setPageLength(props.size());
-      subContent.addComponent(params);
 
       // Center it in the browser window
       subWindow.center();
@@ -470,7 +502,6 @@ public class Controller {
   }
 
   private String createStatisticsSample(List<Property> xmlProps, Map<String, String> props) {
-    XMLParser xmlParser = new XMLParser();
     String qProperties = "";
     try {
       qProperties = xmlParser.toString(xmlParser.createXMLFromProperties(xmlProps));
@@ -480,25 +511,15 @@ public class Controller {
     }
     Map<String, Object> params = new HashMap<String, Object>();
     params.put("code", newSampleCode);
-    params.put("type", POWER_SAMPLE_TYPE); // sample type - e.g. Q_BMI...
+    params.put("type", POWER_SAMPLE_TYPE);
 
     params.put("parents",
-        new ArrayList<String>(Arrays.asList('/' + space + '/' + project + "000"))); // these need to
-                                                                                    // be
-                                                                                    // identifiers
-                                                                                    // of the parent
-                                                                                    // samples
-                                                                                    // (including
-                                                                                    // the space)!
-                                                                                    // E.g.
-                                                                                    // /MULTISCALE_HCC/QMSHSENTITY-1
+        new ArrayList<String>(Arrays.asList('/' + space + '/' + project + "000")));
 
     params.put("project", project);
     params.put("space", space);
-    params.put("experiment", project + "_INFO"); // e.g. the Q_BMI... experiment - the code is
-                                                 // usually built differently than in this example!
-
-    props.put("Q_PROPERTIES", qProperties); // xml properties, not important
+    params.put("experiment", project + "_INFO");
+    props.put("Q_PROPERTIES", qProperties); // xml properties
     params.put("properties", props);
 
     openbis.ingest("DSS1", "register-samp", params);
@@ -512,7 +533,6 @@ public class Controller {
     if (exp == null) {
       logger.error("could not find info experiment" + infoExp);
     } else {
-      studyXMLParser = new StudyXMLParser();
       try {
         expDesign = studyXMLParser.parseXMLString(exp.getProperties().get("Q_EXPERIMENTAL_SETUP"));
         logger.debug("setting exp design: " + expDesign);
