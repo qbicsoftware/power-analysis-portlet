@@ -136,15 +136,15 @@ public class VMConnection {
     ProcessBuilderWrapper pbd = null;
     try {
       System.out.println("sending: " + cmd);
-//      pbd = new ProcessBuilderWrapper(cmd, false);
+      pbd = new ProcessBuilderWrapper(cmd, false);
     } catch (Exception e) {
       e.printStackTrace();
     }
-//    if (pbd.getStatus() != 0) {
-//      System.out.println("Command has terminated with status: " + pbd.getStatus());
-//      System.out.println("Error: " + pbd.getErrors());
-//      System.out.println("Last command sent: " + cmd);
-//    }
+    if (pbd.getStatus() != 0) {
+      System.out.println("Command has terminated with status: " + pbd.getStatus());
+      System.out.println("Error: " + pbd.getErrors());
+      System.out.println("Last command sent: " + cmd);
+    }
   }
 
   /**
