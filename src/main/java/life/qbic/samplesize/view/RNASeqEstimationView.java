@@ -2,11 +2,15 @@ package life.qbic.samplesize.view;
 
 import java.util.List;
 import java.util.Map;
+import com.vaadin.data.Property.ValueChangeEvent;
+import com.vaadin.data.Property.ValueChangeListener;
 import com.vaadin.ui.Button;
 import com.vaadin.ui.Button.ClickEvent;
+import jline.internal.Log;
+import life.qbic.portal.Styles;
+import life.qbic.portal.Styles.NotificationType;
 import life.qbic.samplesize.control.MathHelpers;
 import life.qbic.samplesize.control.VMConnection;
-import life.qbic.samplesize.model.EstimationMode;
 import life.qbic.samplesize.model.SliderFactory;
 import life.qbic.xml.properties.Property;
 import life.qbic.xml.properties.PropertyType;
@@ -18,8 +22,10 @@ public class RNASeqEstimationView extends ARNASeqPrepView {
       String infoText, String link) {
     super(deGenes, fdr, minFC, avgReads, dispersion, title, infoText, link);
 
-    button = new Button("Compute Power Curve");
+    button = new Button("Compute Power");
+    button.setEnabled(false);
     addComponent(button);
+
     button.addClickListener(new Button.ClickListener() {
 
       @Override
@@ -37,10 +43,53 @@ public class RNASeqEstimationView extends ARNASeqPrepView {
         double lambda0 = avgReadCountSlider.getValue();
 
         if (useTestData()) {
-          v.sampleSizeWithData(newSampleCode, m, m1, f, getTestDataSet(), EstimationMode.TCGA);
+          try {
+            v.sampleSizeWithData(nextSampleCode, m, m1, f, getTestDataName(), getDataMode());
+            Styles.notification("New power estimations started",
+                "It may take a while for power estimations on real data to finish. You can come back later or refresh the project at the top from time to time to update the current status.",
+                NotificationType.SUCCESS);
+          } catch (Exception e) {
+            Styles.notification("Estimation could not be run",
+                "Something went wrong. Please try again or contact us if the problem persists.",
+                NotificationType.ERROR);
+            Log.error(e.getMessage());
+          }
         } else {
-          v.sampleSize(newSampleCode, m, m1, phi0, f, lambda0);
+          try {
+            v.sampleSize(nextSampleCode, m, m1, phi0, f, lambda0);
+            Styles.notification("New power estimations started",
+                "Please allow a few minutes for the sample size estimation to finish. You can come back later or refresh the project to update the current status.",
+                NotificationType.SUCCESS);
+          } catch (Exception e) {
+            Styles.notification("Estimation could not be run",
+                "Something went wrong. Please try again or contact us if the problem persists.",
+                NotificationType.ERROR);
+            Log.error(e.getMessage());
+          }
         }
+      }
+    });
+    pilotData.addValueChangeListener(new ValueChangeListener() {
+
+      @Override
+      public void valueChange(ValueChangeEvent event) {
+        button.setEnabled(inputsReady());
+      }
+    });
+
+    testData.addValueChangeListener(new ValueChangeListener() {
+
+      @Override
+      public void valueChange(ValueChangeEvent event) {
+        button.setEnabled(inputsReady());
+      }
+    });
+    
+    parameterSource.addValueChangeListener(new ValueChangeListener() {
+
+      @Override
+      public void valueChange(ValueChangeEvent event) {
+        button.setEnabled(inputsReady());
       }
     });
   }
@@ -66,7 +115,7 @@ public class RNASeqEstimationView extends ARNASeqPrepView {
       xmlProps.add(new Property("avg_read_count", Double.toString(avgReadCountSlider.getValue()),
           PropertyType.Property));
     } else {
-      xmlProps.add(new Property("base_dataset", getTestDataSet(), PropertyType.Property));
+      xmlProps.add(new Property("base_dataset", getTestDataName(), PropertyType.Property));
     }
     return xmlProps;
   }

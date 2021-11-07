@@ -15,6 +15,7 @@ import com.vaadin.ui.UI;
 import com.vaadin.ui.VerticalLayout;
 import com.vaadin.ui.Window;
 import com.vaadin.ui.Button.ClickEvent;
+import jline.internal.Log;
 import life.qbic.portal.Styles;
 import life.qbic.portal.Styles.NotificationType;
 import life.qbic.samplesize.control.MathHelpers;
@@ -35,21 +36,21 @@ public class RNASeqCheckView extends ARNASeqPrepView {
 
   private ComboBox factors;
   private Map<String, Map<String, Set<String>>> sampleSizesOfFactorLevels;
-  private Map<String, Set<String>> selectedLevels;
-  
+  private Map<String, Set<String>> selectedLevels = new HashMap<>();
+
   public RNASeqCheckView(VMConnection v, SliderFactory deGenes, SliderFactory fdr,
       SliderFactory minFC, SliderFactory avgReads, SliderFactory dispersion, String title,
       String infoText, String link) {
     super(deGenes, fdr, minFC, avgReads, dispersion, title, infoText, link);
-    
+
     fdrSlider.setVisible(false);
 
     factors = new ComboBox("Study Factor");
-    
+
     factors.setNullSelectionAllowed(false);
     factors.setImmediate(true);
     addComponent(factors);
-    
+
     button = new Button("Estimation based on existing samples.");
     button.setEnabled(false);
 
@@ -57,28 +58,7 @@ public class RNASeqCheckView extends ARNASeqPrepView {
 
       @Override
       public void valueChange(ValueChangeEvent event) {
-        String factor = (String) factors.getValue();
-        if (factor != null) {
-          Map<String, Set<String>> levels = sampleSizesOfFactorLevels.get(factor);
-          switch (levels.size()) {
-            case 0:
-            case 1:
-              Styles.notification("Can't perform Power Estimation",
-                  "Two study groups are needed for power estimation. " + factor + " contains "
-                      + levels.size() + " levels.",
-                  NotificationType.DEFAULT);
-              break;
-            case 3:
-              selectLevelsPopup(factor, levels);
-              break;
-            default:
-              selectedLevels = levels;
-              button.setEnabled(true);
-              break;
-          }
-        } else {
-          button.setEnabled(false);
-        }
+        checkInputsReady();
       }
     });
 
@@ -101,23 +81,91 @@ public class RNASeqCheckView extends ARNASeqPrepView {
         int sampleSize = getMinSampleSizeOfFactor();
 
         if (useTestData()) {
-          v.powerWithData(newSampleCode, m, m1, sampleSize, getTestDataSet(),
-              EstimationMode.TCGA);
+          try {
+            v.powerWithData(nextSampleCode, m, m1, sampleSize, getTestDataName(), getDataMode());
+            Styles.notification("New power estimations started",
+                "It may take a while for power estimations on real data to finish. You can come back later or refresh the project at the top from time to time to update the current status.",
+                NotificationType.SUCCESS);
+          } catch (Exception e) {
+            Styles.notification("Estimation could not be run",
+                "Something went wrong. Please try again or contact us if the problem persists.",
+                NotificationType.ERROR);
+            Log.error(e.getMessage());
+          }
+
         } else {
-          v.power(newSampleCode, m, m1, sampleSize, phi0, avgReads);
+          try {
+            v.power(nextSampleCode, m, m1, sampleSize, phi0, avgReads);
+            Styles.notification("New power estimations started",
+                "Please allow a few minutes for the power estimation to finish. You can come back later or refresh the project to update the current status.",
+                NotificationType.SUCCESS);
+          } catch (Exception e) {
+            Styles.notification("Estimation could not be run",
+                "Something went wrong. Please try again or contact us if the problem persists.",
+                NotificationType.ERROR);
+            Log.error(e.getMessage());
+          }
         }
+      }
+    });
+
+
+    pilotData.addValueChangeListener(new ValueChangeListener() {
+
+      @Override
+      public void valueChange(ValueChangeEvent event) {
+        checkInputsReady();
+      }
+    });
+
+    testData.addValueChangeListener(new ValueChangeListener() {
+
+      @Override
+      public void valueChange(ValueChangeEvent event) {
+        checkInputsReady();
+      }
+    });
+
+    parameterSource.addValueChangeListener(new ValueChangeListener() {
+
+      @Override
+      public void valueChange(ValueChangeEvent event) {
+        checkInputsReady();
       }
     });
   }
 
+  protected void checkInputsReady() {
+    String factor = (String) factors.getValue();
+    if (factor != null) {
+      Map<String, Set<String>> levels = sampleSizesOfFactorLevels.get(factor);
+      if (selectedLevels.size() == 2) {
+        button.setEnabled(inputsReady());
+      } else if (levels.size() < 2) {
+        Styles.notification("Can't perform Power Estimation",
+            "Two study groups are needed for power estimation. " + factor + " contains "
+                + levels.size() + " levels.",
+            NotificationType.DEFAULT);
+      } else if (levels.size() > 2) {
+        selectLevelsPopup(factor, levels);
+      } else {
+        selectedLevels = levels;
+      }
+    } else {
+      button.setEnabled(false);
+    }
+  }
+
+
+
   protected int getMinSampleSizeOfFactor() {
     int n = Integer.MAX_VALUE;
-    for(Set<String> group : selectedLevels.values()) {
+    for (Set<String> group : selectedLevels.values()) {
       n = Math.min(n, group.size());
     }
     return n;
   }
-  
+
   protected void selectLevelsPopup(String factor, Map<String, Set<String>> levels) {
     Window subWindow = new Window("Level selection");
     subWindow.setWidth("300");
@@ -178,13 +226,13 @@ public class RNASeqCheckView extends ARNASeqPrepView {
     subWindow.center();
     // Open it in the UI
     UI.getCurrent().addWindow(subWindow);
-//old
-    //  List<Integer> levels = factorToLevelSize.get(factors.getValue());
-  //  int res = Integer.MAX_VALUE;
-  //  for (int groupSize : levels) {
-   //   res = Math.min(res, groupSize);
-   // }
-   // return res;
+    // old
+    // List<Integer> levels = factorToLevelSize.get(factors.getValue());
+    // int res = Integer.MAX_VALUE;
+    // for (int groupSize : levels) {
+    // res = Math.min(res, groupSize);
+    // }
+    // return res;
   }
 
   @Override
@@ -208,7 +256,7 @@ public class RNASeqCheckView extends ARNASeqPrepView {
       xmlProps.add(new Property("dispersion", Double.toString(dispersionSlider.getValue()),
           PropertyType.Property));
     } else {
-      xmlProps.add(new Property("base_dataset", getTestDataSet(), PropertyType.Property));
+      xmlProps.add(new Property("base_dataset", getTestDataName(), PropertyType.Property));
     }
     return xmlProps;
   }

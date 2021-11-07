@@ -4,18 +4,19 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-
 import com.vaadin.data.Property;
+import com.vaadin.data.Property.ValueChangeEvent;
+import com.vaadin.data.Property.ValueChangeListener;
 import com.vaadin.ui.HorizontalLayout;
 import com.vaadin.ui.ListSelect;
 import com.vaadin.ui.OptionGroup;
 import com.vaadin.ui.Table;
 import com.vaadin.ui.VerticalLayout;
-
 import life.qbic.portal.Styles;
 import life.qbic.samplesize.components.ParameterEstimationComponent;
 import life.qbic.samplesize.components.SliderWithLabel;
 import life.qbic.samplesize.model.Constants;
+import life.qbic.samplesize.model.EstimationMode;
 import life.qbic.samplesize.model.RNACountData;
 import life.qbic.samplesize.model.SliderFactory;
 
@@ -30,9 +31,10 @@ public abstract class ARNASeqPrepView extends AContainerPrepView {
       avgReadCountSlider, dispersionSlider;
 
   public ARNASeqPrepView(SliderFactory deGenes, SliderFactory fdr, SliderFactory minFC,
-      SliderFactory avgReads, SliderFactory dispersion, String title, String infoText, String link) {
+      SliderFactory avgReads, SliderFactory dispersion, String title, String infoText,
+      String link) {
     super(title, infoText, link);
-    
+
     percDEGenesSlider = deGenes.getSliderWithLabel();
     minFoldChangeSlider = minFC.getSliderWithLabel();
     fdrSlider = fdr.getSliderWithLabel();
@@ -78,6 +80,7 @@ public abstract class ARNASeqPrepView extends AContainerPrepView {
       switch (val) {
         case "Use pilot data (recommended)":
           pilotData.setVisible(true);
+          pilotData.setSelectable(true);
           if (pilotData.isEmpty()) {
             System.out.println("no pilot data found");
           }
@@ -104,6 +107,7 @@ public abstract class ARNASeqPrepView extends AContainerPrepView {
 
     testData = new ListSelect("Available Test Datasets");
     testData.addItems(Constants.TCGA_DATASETS.keySet());
+    testData.setNullSelectionAllowed(false);
     testData.setVisible(false);
     optionBox.addComponent(testData);
 
@@ -121,12 +125,41 @@ public abstract class ARNASeqPrepView extends AContainerPrepView {
   }
 
   protected boolean useTestData() {
-    String val = (String) parameterSource.getValue();
-    return val.equals("Compute using TCGA data");
+    EstimationMode mode = getDataMode();
+    return mode.equals(EstimationMode.Data) || mode.equals(EstimationMode.TCGA);
   }
 
-  protected String getTestDataSet() {
-    return Constants.TCGA_DATASETS.get(testData.getValue());
+  protected EstimationMode getDataMode() {
+    String val = (String) parameterSource.getValue();
+    switch (val) {
+      case "Compute using TCGA data":
+        return EstimationMode.TCGA;
+      case "Use pilot data (recommended)":
+        return EstimationMode.Data;
+      default:
+        return EstimationMode.None;
+    }
+  }
+
+  protected boolean inputsReady() {
+    EstimationMode mode = getDataMode();
+    if (mode.equals(EstimationMode.Data) || mode.equals(EstimationMode.TCGA)) {
+      return getTestDataName() != null;
+    }
+    return true;
+  }
+
+  protected String getTestDataName() {
+    if (getDataMode().equals(EstimationMode.TCGA)) {
+      return Constants.TCGA_DATASETS.get(testData.getValue());
+    }
+    if (getDataMode().equals(EstimationMode.Data)) {
+      RNACountData data = (RNACountData) pilotData.getValue();
+      if (data != null) {
+        return data.getSampleCode();
+      }
+    }
+    return null;
   }
 
   private void hideComplexInputs() {
