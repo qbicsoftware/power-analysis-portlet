@@ -50,36 +50,6 @@ public class VMConnection {
     return res;
   }
 
-  // public void touchTest() {
-  // ArrayList<String> cmd = new ArrayList<>(Arrays.asList("ssh", vm, "touch", "testfile.txt"));
-  // ProcessBuilderWrapper pbd = null;
-  // try {
-  // System.out.println("sending: " + cmd);
-  // pbd = new ProcessBuilderWrapper(cmd);
-  // } catch (Exception e) {
-  // e.printStackTrace();
-  // }
-  // if (pbd.getStatus() != 0) {
-  // System.out.println("Command has terminated with status: " + pbd.getStatus());
-  // System.out.println("Error: " + pbd.getErrors());
-  // System.out.println("Last command sent: " + cmd);
-  // }
-  // }
-
-  // mode <- as.numeric(args[1]) # mode: data, tcga, none
-  // m <- as.numeric(args[2]) # number of genes
-  // m1 <- as.numeric(args[3]) # expected number of DE genes
-  // f <- as.numeric(args[4]) # FDR
-  //
-  // if(mode=="none") {
-  // phi0 <- as.numeric(args[5]) # dispersion
-  // lambda0 <- as.numeric(args[6]) # avg. read count/gene
-  // result_file <- args[7]
-  // }
-  // if(mode=="tcga") {
-  // tcga <- args[5]
-  // result_file <- args[6]
-
   private ArrayList<String> getSampleSizeMatrixCommand(int genes, int deGenes, double fdr,
       double dispersion, double avgReadCount) {
     ArrayList<String> res =
