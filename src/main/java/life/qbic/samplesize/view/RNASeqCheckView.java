@@ -236,15 +236,15 @@ public class RNASeqCheckView extends ARNASeqPrepView {
   }
 
   @Override
-  public Map<String, String> getProps() {
-    Map<String, String> res = super.getProps();
+  public Map<String, String> getMetadata() {
+    Map<String, String> res = super.getMetadata();
     res.put("Q_SECONDARY_NAME", "Power Estimation");
     return res;
   }
 
   @Override
-  public List<Property> getCurrentProperties() {
-    List<Property> xmlProps = super.getCurrentProperties();
+  public List<Property> getCurrentParameters() {
+    List<Property> xmlProps = super.getCurrentParameters();
     xmlProps.add(
         new Property("maximum_fdr", Double.toString(fdrSlider.getValue()), PropertyType.Property));
     xmlProps.add(new Property("diff_expr_genes",
@@ -254,6 +254,8 @@ public class RNASeqCheckView extends ARNASeqPrepView {
 
     if (!useTestData()) {
       xmlProps.add(new Property("dispersion", Double.toString(dispersionSlider.getValue()),
+          PropertyType.Property));
+      xmlProps.add(new Property("avg_read_count", Double.toString(avgReadCountSlider.getValue()),
           PropertyType.Property));
     } else {
       xmlProps.add(new Property("base_dataset", getTestDataName(), PropertyType.Property));

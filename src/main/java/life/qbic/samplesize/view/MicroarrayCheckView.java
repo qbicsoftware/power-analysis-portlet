@@ -172,15 +172,15 @@ public class MicroarrayCheckView extends AHeatMapPrepView {
   }
 
   @Override
-  public Map<String, String> getProps() {
-    Map<String, String> res = super.getProps();
+  public Map<String, String> getMetadata() {
+    Map<String, String> res = super.getMetadata();
     res.put("Q_SECONDARY_NAME", "Power Estimation");
     return res;
   }
 
   @Override
-  public List<Property> getCurrentProperties() {
-    List<Property> xmlProps = super.getCurrentProperties();
+  public List<Property> getCurrentParameters() {
+    List<Property> xmlProps = super.getCurrentParameters();
     Iterator<Set<String>> groups = selectedLevels.values().iterator();
     int n1 = groups.next().size();
     int n2 = groups.next().size();

@@ -62,11 +62,11 @@ public abstract class APowerView extends VerticalLayout {
     return project;
   }
 
-  public Map<String, String> getProps() {
+  public Map<String, String> getMetadata() {
     return new HashMap<>();
   }
 
-  public List<Property> getCurrentProperties() {
+  public List<Property> getCurrentParameters() {
     return new ArrayList<Property>();
   }
 

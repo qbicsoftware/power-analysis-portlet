@@ -30,15 +30,15 @@ public abstract class AHeatMapPrepView extends APowerView {
   }
   
   @Override
-  public Map<String, String> getProps() {
-    Map<String,String> res = super.getProps();
+  public Map<String, String> getMetadata() {
+    Map<String,String> res = super.getMetadata();
     res.put("Q_TECHNOLOGY_TYPE", "DNA Microarray");
     return res;
   }
   
   @Override
-  public List<Property> getCurrentProperties() {
-    return super.getCurrentProperties();
+  public List<Property> getCurrentParameters() {
+    return super.getCurrentParameters();
   }
 
 }

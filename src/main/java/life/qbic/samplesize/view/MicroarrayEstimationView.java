@@ -57,15 +57,15 @@ public class MicroarrayEstimationView extends AHeatMapPrepView {
   }
 
   @Override
-  public Map<String, String> getProps() {
-    Map<String, String> res = super.getProps();
+  public Map<String, String> getMetadata() {
+    Map<String, String> res = super.getMetadata();
     res.put("Q_SECONDARY_NAME", "Sample Size Estimation");
     return res;
   }
 
   @Override
-  public List<Property> getCurrentProperties() {
-    List<Property> xmlProps = super.getCurrentProperties();
+  public List<Property> getCurrentParameters() {
+    List<Property> xmlProps = super.getCurrentParameters();
     xmlProps.add(new Property("diff_expr_genes", Double.toString(deGenesSlider.getValue()) + '%',
         PropertyType.Property));
     return xmlProps;

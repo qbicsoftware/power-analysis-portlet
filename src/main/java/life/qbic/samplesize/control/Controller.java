@@ -543,7 +543,7 @@ public class Controller {
       @Override
       public void buttonClick(ClickEvent event) {
         incrementPowerSampleCode();
-        createStatisticsSample(powerView.getCurrentProperties(), powerView.getProps());
+        createStatisticsSample(powerView.getCurrentParameters(), powerView.getMetadata());
         powerView.setNextSampleCode(nextSampleCode);
       }
     };

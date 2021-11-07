@@ -193,8 +193,8 @@ public abstract class ARNASeqPrepView extends AContainerPrepView {
   }
 
   @Override
-  public Map<String, String> getProps() {
-    Map<String, String> res = super.getProps();
+  public Map<String, String> getMetadata() {
+    Map<String, String> res = super.getMetadata();
     res.put("Q_TECHNOLOGY_TYPE", "RNA-Sequencing");
     return res;
   }

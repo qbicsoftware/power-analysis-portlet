@@ -23,7 +23,6 @@ public class RNASeqEstimationView extends ARNASeqPrepView {
     super(deGenes, fdr, minFC, avgReads, dispersion, title, infoText, link);
 
     button = new Button("Compute Power");
-    button.setEnabled(false);
     addComponent(button);
 
     button.addClickListener(new Button.ClickListener() {
@@ -84,7 +83,7 @@ public class RNASeqEstimationView extends ARNASeqPrepView {
         button.setEnabled(inputsReady());
       }
     });
-    
+
     parameterSource.addValueChangeListener(new ValueChangeListener() {
 
       @Override
@@ -95,17 +94,15 @@ public class RNASeqEstimationView extends ARNASeqPrepView {
   }
 
   @Override
-  public Map<String, String> getProps() {
-    Map<String, String> res = super.getProps();
+  public Map<String, String> getMetadata() {
+    Map<String, String> res = super.getMetadata();
     res.put("Q_SECONDARY_NAME", "Sample Size Estimation");
     return res;
   }
 
   @Override
-  public List<Property> getCurrentProperties() {
-    List<Property> xmlProps = super.getCurrentProperties();
-    xmlProps.add(
-        new Property("maximum_fdr", Double.toString(fdrSlider.getValue()), PropertyType.Property));
+  public List<Property> getCurrentParameters() {
+    List<Property> xmlProps = super.getCurrentParameters();
     xmlProps.add(new Property("diff_expr_genes",
         Double.toString(percDEGenesSlider.getValue()) + '%', PropertyType.Property));
 
