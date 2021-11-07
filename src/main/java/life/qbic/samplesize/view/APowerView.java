@@ -16,7 +16,7 @@ import life.qbic.xml.properties.Property;
 public abstract class APowerView extends VerticalLayout {
 
   protected String projectID;
-  protected String newSampleCode;
+  protected String nextSampleCode;
   protected Button button;
 
   public APowerView(String title, String infoText, String link) {
@@ -44,9 +44,13 @@ public abstract class APowerView extends VerticalLayout {
     addComponent(link);
   }
 
-  public void setProjectContext(String projectID, String newSampleCode) {
+  public void setProjectContext(String projectID, String nextSampleCode) {
     this.projectID = projectID;
-    this.newSampleCode = newSampleCode;
+    setNextSampleCode(nextSampleCode);
+  }
+  
+  public void setNextSampleCode(String nextSampleCode) {
+    this.nextSampleCode = nextSampleCode;
   }
 
   public Button getButton() {
@@ -56,10 +60,6 @@ public abstract class APowerView extends VerticalLayout {
   public String getProject() {
     String project = projectID.split("/")[2];
     return project;
-  }
-
-  public String getNewSampleCode() {
-    return newSampleCode;
   }
 
   public Map<String, String> getProps() {
