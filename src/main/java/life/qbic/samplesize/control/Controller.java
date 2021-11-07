@@ -2,6 +2,7 @@ package life.qbic.samplesize.control;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.time.Instant;
 import java.util.Date;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,6 +23,7 @@ import com.vaadin.server.Resource;
 import com.vaadin.shared.ui.combobox.FilteringMode;
 import com.vaadin.ui.ComboBox;
 import com.vaadin.ui.Embedded;
+import com.vaadin.ui.HorizontalLayout;
 import com.vaadin.ui.Link;
 import com.vaadin.ui.TabSheet;
 import com.vaadin.ui.Table;
@@ -70,7 +72,7 @@ public class Controller {
           + "the data. Based on the R package <b>OCplus</b> by Pawitan et al. (2013)";
 
   private final String RNAPowerInformation =
-      "Estimates the needed sample size for an experimental design. "
+      "Estimates the necessary sample size for an experimental design. "
           + "Creates a matrix showing needed sample size to reach different power (sensitivity) levels in order to detect "
           + "for detecting differential expression of different log fold changes. Needs maximum tolerated false discovery "
           + "rate (FDR), as well as estimated percentage of differentiall expressed genes as input. Dispersion and "
@@ -91,9 +93,10 @@ public class Controller {
   private OpenBisClient openbis;
   private VerticalLayout mainLayout;
   final String POWER_SAMPLE_TYPE = "Q_POWER_ESTIMATION_RUN";
-  final String RNASEQ_COUNT_SAMPLE_TYPE = "Q_WF_NGS_RNA_EXPRESSION_ANALYSIS_RUN";
+  final List<String> RNASEQ_COUNT_SAMPLE_TYPES =
+      Arrays.asList("Q_WF_NGS_RNA_EXPRESSION_ANALYSIS_RUN", "Q_WF_NGS_MAPPING_RUN");
 
-  private String newSampleCode;
+  private String nextSampleCode;
 
   protected String projectID;
 
@@ -105,12 +108,22 @@ public class Controller {
 
   private Table runTable;
 
+  private TabSheet tabs;
+
   private Map<String, Resource> resourcesForSamples;
 
   private final StudyXMLParser studyXMLParser = new StudyXMLParser();
   private final XMLParser xmlParser = new XMLParser();
 
   private JAXBElement<Qexperiment> expDesign;
+
+  private MicroarrayEstimationView maEstView;
+
+  private RNASeqEstimationView rnaEstView;
+
+  private MicroarrayCheckView maCheckView;
+
+  private RNASeqCheckView rnaCheckView;
 
   public Controller(OpenBisClient openbis, VerticalLayout layout, ConfigurationManager config,
       String user) {
@@ -129,14 +142,12 @@ public class Controller {
         projectIDs.add(p.getIdentifier().getIdentifier());
       }
     }
-    // new Statistics(openbis, projectIDs);
 
     VMConnection vm = new VMConnection(
         config.getSampleSizeVMUser() + "@" + config.getEpitopeAndSampleSizeVMHost(),
         config.getRNASeqSampleSizeContainerName(), ".", user);
     RController R = new RController(config.getRServeHost(), config.getRServePort(),
         config.getRServeUser(), config.getRServePassword());
-
     initView(vm, R, projectIDs);
   }
 
@@ -159,7 +170,7 @@ public class Controller {
 
   private void initView(VMConnection vm, RController R, List<String> projectIDs) {
 
-    TabSheet tabs = new TabSheet();
+    tabs = new TabSheet();
 
     SliderFactory sensitivity =
         new SliderFactory("Minimum Sensitivity", "power", 2, 0.1, 1.0, 0.8, "200px");
@@ -173,16 +184,16 @@ public class Controller {
     SliderFactory dispersion =
         new SliderFactory("Average dispersion", "phi0", 4, 0.0001, 20, 1, "200px");
 
-    RNASeqCheckView rnaCheckView = new RNASeqCheckView(vm, deGenes, fdr, minFC, avgReads,
-        dispersion, "RNA-Seq Power Estimation based on Experimental Design",
-        RNAExperimentalDesignInformation, rnaseqsamplesize);
-    RNASeqEstimationView rnaEstView = new RNASeqEstimationView(vm, deGenes, fdr, minFC, avgReads,
-        dispersion, "RNA-Seq Sample Size Estimation", RNAPowerInformation, rnaseqsamplesize);
-    MicroarrayCheckView maCheckView = new MicroarrayCheckView(R, sensitivity,
+    rnaCheckView = new RNASeqCheckView(vm, deGenes, fdr, minFC, avgReads, dispersion,
+        "RNA-Seq Power Estimation based on Experimental Design", RNAExperimentalDesignInformation,
+        rnaseqsamplesize);
+    rnaEstView = new RNASeqEstimationView(vm, deGenes, fdr, minFC, avgReads, dispersion,
+        "RNA-Seq Sample Size Estimation", RNAPowerInformation, rnaseqsamplesize);
+    maCheckView = new MicroarrayCheckView(R, sensitivity,
         "Microarray Power Estimation based on Experimental Design",
         microArrayExperimentalDesignInformation, ocPlus);
-    MicroarrayEstimationView maEstView = new MicroarrayEstimationView(R, deGenes,
-        "Microarray Sample Size Estimation", microArrayPowerInformation, ocPlus);
+    maEstView = new MicroarrayEstimationView(R, deGenes, "Microarray Sample Size Estimation",
+        microArrayPowerInformation, ocPlus);
 
 
     tabs.addTab(rnaCheckView, "RNA-Seq Power");
@@ -190,16 +201,14 @@ public class Controller {
     tabs.addTab(maEstView, "Microarray Sample Size");
     tabs.addTab(maCheckView, "Microarray Power");
 
-
-
     tabs.getTab(rnaCheckView).setEnabled(false);
     tabs.getTab(maCheckView).setEnabled(false);
 
     initTabButtonListener(rnaCheckView);
     initTabButtonListener(rnaEstView);
 
-    // initTabButtonListener(maEstView);
-    // initTabButtonListener(maCheckView);
+    initTabButtonListener(maEstView);
+    initTabButtonListener(maCheckView);
 
     ComboBox projectBox = new ComboBox("Select a project");
     projectBox.setNullSelectionAllowed(false);
@@ -211,53 +220,7 @@ public class Controller {
 
       @Override
       public void valueChange(ValueChangeEvent event) {
-        if (projectBox.getValue() != null) {
-          projectID = (String) projectBox.getValue();
-          space = projectID.split("/")[1];
-          project = projectID.split("/")[2];
-          infoExpID = ExperimentCodeFunctions.getInfoExperimentID(space, project);
-
-          List<Sample> allSamples = openbis.getSamplesOfProject(projectID);
-          Map<String, List<Sample>> samplesByType = new HashMap<>();
-          for (Sample s : allSamples) {
-            String type = s.getType().getCode();
-            if (samplesByType.containsKey(type)) {
-              samplesByType.get(type).add(s);
-            } else {
-              List<Sample> list = new ArrayList<>(Arrays.asList(s));
-              samplesByType.put(type, list);
-            }
-          }
-          Map<String, Map<String, Set<String>>> sampleSizesOfFactorLevels =
-              getSampleSizesForFactors(infoExpID, samplesByType);
-
-          System.out.println(sampleSizesOfFactorLevels);
-
-          List<RNACountData> pilotData =
-              preparePilotDataInfo(samplesByType.get(RNASEQ_COUNT_SAMPLE_TYPE));
-          System.out.println("pilotdata");
-
-          List<Sample> powerSamples = samplesByType.get(POWER_SAMPLE_TYPE);
-          if (powerSamples == null) {
-            powerSamples = new ArrayList<>();
-          }
-
-          showExistingRuns(powerSamples);
-          String newSampleCode = newPowerSampleCode(powerSamples);
-
-          maEstView.setProjectContext(projectID, newSampleCode);
-          rnaEstView.setProjectContext(projectID, newSampleCode, pilotData);
-          maCheckView.setProjectContext(projectID, newSampleCode);
-          rnaCheckView.setProjectContext(projectID, newSampleCode, pilotData);
-          enableDesignBasedViews(!sampleSizesOfFactorLevels.isEmpty());
-          maCheckView.setDesigns(sampleSizesOfFactorLevels);
-          rnaCheckView.setDesigns(sampleSizesOfFactorLevels);
-        }
-      }
-
-      private void enableDesignBasedViews(boolean hasDesign) {
-        tabs.getTab(maCheckView).setEnabled(hasDesign);
-        tabs.getTab(rnaCheckView).setEnabled(hasDesign);
+        loadProject(projectBox);
       }
 
     });
@@ -274,12 +237,77 @@ public class Controller {
     runTable.setColumnAlignment("Show", Align.CENTER);
     runTable.addContainerProperty("Parameters", Button.class, null);
     runTable.setColumnAlignment("Parameters", Align.CENTER);
-    runTable.addContainerProperty("Date", Date.class, null);
+    runTable.addContainerProperty("Started at", Date.class, null);
+
+    HorizontalLayout projectBoxLayout = new HorizontalLayout();
+
+    Button refreshProject = new Button();
+    refreshProject.setIcon(FontAwesome.REFRESH);
+
+    refreshProject.addClickListener(new ClickListener() {
+
+      @Override
+      public void buttonClick(ClickEvent event) {
+        loadProject(projectBox);
+      }
+    });
 
     mainLayout.addComponent(projectBox);
+    mainLayout.addComponent(refreshProject);
+
+    mainLayout.addComponent(projectBoxLayout);
 
     mainLayout.addComponent(runTable);
     mainLayout.addComponent(tabs);
+  }
+
+  protected void loadProject(ComboBox projectBox) {
+    if (projectBox.getValue() != null) {
+      projectID = (String) projectBox.getValue();
+      space = projectID.split("/")[1];
+      project = projectID.split("/")[2];
+      infoExpID = ExperimentCodeFunctions.getInfoExperimentID(space, project);
+
+      List<Sample> allSamples = openbis.getSamplesOfProject(projectID);
+      Map<String, List<Sample>> samplesByType = new HashMap<>();
+      for (Sample s : allSamples) {
+        String type = s.getType().getCode();
+        if (samplesByType.containsKey(type)) {
+          samplesByType.get(type).add(s);
+        } else {
+          List<Sample> list = new ArrayList<>(Arrays.asList(s));
+          samplesByType.put(type, list);
+        }
+      }
+      Map<String, Map<String, Set<String>>> sampleSizesOfFactorLevels =
+          getSampleSizesForFactors(infoExpID, samplesByType);
+
+      List<RNACountData> pilotData = new ArrayList<>();
+      for (String type : RNASEQ_COUNT_SAMPLE_TYPES) {
+        pilotData.addAll(preparePilotDataInfo(samplesByType.get(type)));
+      }
+
+      List<Sample> powerSamples = samplesByType.get(POWER_SAMPLE_TYPE);
+      if (powerSamples == null) {
+        powerSamples = new ArrayList<>();
+      }
+
+      showExistingRuns(powerSamples);
+      setCurrentPowerSampleCode(powerSamples);
+
+      maEstView.setProjectContext(projectID, nextSampleCode);
+      rnaEstView.setProjectContext(projectID, nextSampleCode, pilotData);
+      maCheckView.setProjectContext(projectID, nextSampleCode);
+      rnaCheckView.setProjectContext(projectID, nextSampleCode, pilotData);
+      enableDesignBasedViews(!sampleSizesOfFactorLevels.isEmpty());
+      maCheckView.setDesigns(sampleSizesOfFactorLevels);
+      rnaCheckView.setDesigns(sampleSizesOfFactorLevels);
+    }
+  }
+
+  private void enableDesignBasedViews(boolean hasDesign) {
+    tabs.getTab(maCheckView).setEnabled(hasDesign);
+    tabs.getTab(rnaCheckView).setEnabled(hasDesign);
   }
 
   private List<RNACountData> preparePilotDataInfo(List<Sample> list) {
@@ -362,7 +390,6 @@ public class Controller {
       row.add(download);
       row.add(showResult);
 
-      // String user = s.getModifier().getFirstName() + " " + s.getModifier().getLastName();
       Date regDate = s.getRegistrationDate();
       Button paramButton = new Button();
       paramButton.setIcon(FontAwesome.CLIPBOARD);
@@ -370,8 +397,19 @@ public class Controller {
 
         @Override
         public void buttonClick(ClickEvent event) {
-          prepareParamPopup(s);
+
+          String xml = s.getProperties().get("Q_PROPERTIES");
+
+          List<Property> props = new ArrayList<>();
+          try {
+            props = xmlParser.getPropertiesFromXML(xml);
+            prepareParamPopup(props);
+          } catch (JAXBException e) {
+            Log.warn("Properties can not be displayed for sample" + s.getCode());
+            Log.warn(e.getCause().toString());
+          }
         }
+
       });
       row.add(paramButton);
       // row.add(user);
@@ -380,35 +418,67 @@ public class Controller {
       runTable.addItem(row.toArray(new Object[row.size()]), s);
 
     }
+    runTable.sort(new String[] {"Started at"}, new boolean[] {false});
+
     runTable.setVisible(runs > 0);
 
     runTable.setPageLength(runs);
   }
 
-  private void prepareParamPopup(Sample run) {
+
+  private void addNewRunToTable(String newSampleCode, Map<String, String> props,
+      List<Property> xmlProps) {
+
+    List<Object> row = new ArrayList<Object>();
+
+    String tech = props.get("Q_TECHNOLOGY_TYPE");
+    String type = props.get("Q_SECONDARY_NAME");
+    Button showResult = new Button();
+    showResult.setIcon(FontAwesome.HOURGLASS);
+    showResult.setEnabled(false);
+
+    Link download = new Link(null, null);
+    download.setIcon(FontAwesome.HOURGLASS);
+    download.setEnabled(false);
+    row.add(tech);
+    row.add(type);
+    row.add(download);
+    row.add(showResult);
+
+    Date regDate = Date.from(Instant.now());
+    Button paramButton = new Button();
+    paramButton.setIcon(FontAwesome.CLIPBOARD);
+    paramButton.addClickListener(new Button.ClickListener() {
+
+      @Override
+      public void buttonClick(ClickEvent event) {
+        prepareParamPopup(xmlProps);
+      }
+    });
+    row.add(paramButton);
+    row.add(regDate);
+
+    runTable.addItem(row.toArray(new Object[row.size()]), newSampleCode);
+
+    runTable.sort(new String[] {"Started at"}, new boolean[] {false});
+
+    runTable.setPageLength(runTable.size());
+  }
+
+  private void prepareParamPopup(List<Property> props) {
     Window subWindow = new Window("Parameters");
-    subWindow.setWidth("800");
-    subWindow.setHeight("1000");
+    subWindow.setWidth("260");
+    subWindow.setHeight("300");
     VerticalLayout subContent = new VerticalLayout();
     subContent.setSpacing(true);
     subContent.setMargin(true);
     subWindow.setContent(subContent);
 
-    Table paramTable = new Table("Parameters");
+    Table paramTable = new Table("");
     paramTable.setStyleName(Styles.tableTheme);
     paramTable.addContainerProperty("Name", String.class, "");
     paramTable.addContainerProperty("Value", String.class, "");
     paramTable.setVisible(false);
-
-    String xml = run.getProperties().get("Q_PROPERTIES");
-
-    List<Property> props = new ArrayList<>();
-    try {
-      props = xmlParser.getPropertiesFromXML(xml);
-    } catch (JAXBException e) {
-      Log.warn("Properties can not be displayed for sample" + run.getCode());
-      Log.warn(e.getCause().toString());
-    }
 
     for (Property p : props) {
       List<Object> row = new ArrayList<Object>();
@@ -472,14 +542,16 @@ public class Controller {
     ClickListener listener = new Button.ClickListener() {
       @Override
       public void buttonClick(ClickEvent event) {
-        createStatisticsSample(powerView.getCurrentProperties(), powerView.getProps());
         incrementPowerSampleCode();
+        createStatisticsSample(powerView.getCurrentProperties(), powerView.getProps());
+        powerView.setNextSampleCode(nextSampleCode);
       }
     };
     powerView.getButton().addClickListener(listener);
   }
 
-  private String newPowerSampleCode(List<Sample> samples) {
+  private void setCurrentPowerSampleCode(List<Sample> samples) {
+    // 0 if there is no sample, yet
     int latest = 0;
     String prefix = project + "000";
     for (Sample s : samples) {
@@ -489,19 +561,18 @@ public class Controller {
         latest = Math.max(latest, num);
       }
     }
-    String suffix = Integer.toString(latest + 1);
-    newSampleCode = prefix + "-" + suffix;
-    return newSampleCode;
+    String suffix = Integer.toString(latest);
+    nextSampleCode = prefix + "-" + suffix;
   }
 
   private void incrementPowerSampleCode() {
-    String[] splt = newSampleCode.split("-");
+    String[] splt = nextSampleCode.split("-");
     String prefix = splt[0];
     int num = Integer.parseInt(splt[1]);
-    newSampleCode = prefix + '-' + Integer.toString(num + 1);
+    nextSampleCode = prefix + '-' + Integer.toString(num + 1);
   }
 
-  private String createStatisticsSample(List<Property> xmlProps, Map<String, String> props) {
+  private void createStatisticsSample(List<Property> xmlProps, Map<String, String> props) {
     String qProperties = "";
     try {
       qProperties = xmlParser.toString(xmlParser.createXMLFromProperties(xmlProps));
@@ -510,7 +581,7 @@ public class Controller {
       e.printStackTrace();
     }
     Map<String, Object> params = new HashMap<String, Object>();
-    params.put("code", newSampleCode);
+    params.put("code", nextSampleCode);
     params.put("type", POWER_SAMPLE_TYPE);
 
     params.put("parents",
@@ -523,7 +594,8 @@ public class Controller {
     params.put("properties", props);
 
     openbis.ingest("DSS1", "register-samp", params);
-    return newSampleCode;
+
+    addNewRunToTable(nextSampleCode, props, xmlProps);
   }
 
   private Map<String, Map<String, Set<String>>> getSampleSizesForFactors(String infoExp,
@@ -607,9 +679,7 @@ public class Controller {
     for (DataSet ds : datasets) {
       String dsCode = ds.getCode();
       dsCodes.add(dsCode);
-      System.out.println(ds);
       String sampleID = ds.getSample().getIdentifier().getIdentifier();
-      System.out.println(sampleID);
       dataSetCodeToSampleID.put(dsCode, sampleID);
 
       List<DataSetFile> files = openbis.getFilesOfDataSetWithID(dsCode);
@@ -622,7 +692,6 @@ public class Controller {
       try {
         URL url = openbis.getDataStoreDownloadURLLessGeneric(dsCode, dssPath);
         url = new URL(url.toString().replace(":444", ""));
-        System.out.println(url);
         Resource resource = new ExternalResource(url);
 
         resourcesForSamples.put(dataSetCodeToSampleID.get(dsCode), resource);
