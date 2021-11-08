@@ -5,8 +5,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import com.vaadin.data.Property;
-import com.vaadin.data.Property.ValueChangeEvent;
-import com.vaadin.data.Property.ValueChangeListener;
 import com.vaadin.ui.HorizontalLayout;
 import com.vaadin.ui.ListSelect;
 import com.vaadin.ui.OptionGroup;
@@ -15,6 +13,7 @@ import com.vaadin.ui.VerticalLayout;
 import life.qbic.portal.Styles;
 import life.qbic.samplesize.components.ParameterEstimationComponent;
 import life.qbic.samplesize.components.SliderWithLabel;
+import life.qbic.samplesize.control.VMConnection;
 import life.qbic.samplesize.model.Constants;
 import life.qbic.samplesize.model.EstimationMode;
 import life.qbic.samplesize.model.RNACountData;
@@ -29,11 +28,14 @@ public abstract class ARNASeqPrepView extends AContainerPrepView {
   protected ListSelect testData;
   protected SliderWithLabel sensitivitySlider, percDEGenesSlider, fdrSlider, minFoldChangeSlider,
       avgReadCountSlider, dispersionSlider;
+  protected VMConnection vmConnection;
 
-  public ARNASeqPrepView(SliderFactory deGenes, SliderFactory fdr, SliderFactory minFC,
-      SliderFactory avgReads, SliderFactory dispersion, String title, String infoText,
-      String link) {
+  public ARNASeqPrepView(VMConnection v, SliderFactory deGenes, SliderFactory fdr,
+      SliderFactory minFC, SliderFactory avgReads, SliderFactory dispersion, String title,
+      String infoText, String link) {
     super(title, infoText, link);
+
+    vmConnection = v;
 
     percDEGenesSlider = deGenes.getSliderWithLabel();
     minFoldChangeSlider = minFC.getSliderWithLabel();
@@ -142,6 +144,9 @@ public abstract class ARNASeqPrepView extends AContainerPrepView {
   }
 
   protected boolean inputsReady() {
+    if (nextSampleCode == null || nextSampleCode.isEmpty()) {
+      return false;
+    }
     EstimationMode mode = getDataMode();
     if (mode.equals(EstimationMode.Data) || mode.equals(EstimationMode.TCGA)) {
       return getTestDataName() != null;
@@ -198,5 +203,7 @@ public abstract class ARNASeqPrepView extends AContainerPrepView {
     res.put("Q_TECHNOLOGY_TYPE", "RNA-Sequencing");
     return res;
   }
+
+  public abstract void execute();
 
 }

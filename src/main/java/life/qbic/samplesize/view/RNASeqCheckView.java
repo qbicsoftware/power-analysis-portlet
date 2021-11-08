@@ -41,7 +41,7 @@ public class RNASeqCheckView extends ARNASeqPrepView {
   public RNASeqCheckView(VMConnection v, SliderFactory deGenes, SliderFactory fdr,
       SliderFactory minFC, SliderFactory avgReads, SliderFactory dispersion, String title,
       String infoText, String link) {
-    super(deGenes, fdr, minFC, avgReads, dispersion, title, infoText, link);
+    super(v, deGenes, fdr, minFC, avgReads, dispersion, title, infoText, link);
 
     fdrSlider.setVisible(false);
 
@@ -54,85 +54,7 @@ public class RNASeqCheckView extends ARNASeqPrepView {
     button = new Button("Estimation based on existing samples.");
     button.setEnabled(false);
 
-    factors.addValueChangeListener(new ValueChangeListener() {
-
-      @Override
-      public void valueChange(ValueChangeEvent event) {
-        checkInputsReady();
-      }
-    });
-
-    addComponent(button);
-    button.addClickListener(new Button.ClickListener() {
-
-      @Override
-      public void buttonClick(ClickEvent event) {
-
-        int m1 = (int) (100.0 * percDEGenesSlider.getValue());
-        int m = 10000;
-        int gcd = MathHelpers.getGCD(m1, m);
-        m = m / gcd;
-        m1 = m1 / gcd;
-
-        double avgReads = avgReadCountSlider.getValue();
-        // dispersion
-        double phi0 = dispersionSlider.getValue();
-
-        int sampleSize = getMinSampleSizeOfFactor();
-
-        if (useTestData()) {
-          try {
-            v.powerWithData(nextSampleCode, m, m1, sampleSize, getTestDataName(), getDataMode());
-            Styles.notification("New power estimations started",
-                "It may take a while for power estimations on real data to finish. You can come back later or refresh the project at the top from time to time to update the current status.",
-                NotificationType.SUCCESS);
-          } catch (Exception e) {
-            Styles.notification("Estimation could not be run",
-                "Something went wrong. Please try again or contact us if the problem persists.",
-                NotificationType.ERROR);
-            Log.error(e.getMessage());
-          }
-
-        } else {
-          try {
-            v.power(nextSampleCode, m, m1, sampleSize, phi0, avgReads);
-            Styles.notification("New power estimations started",
-                "Please allow a few minutes for the power estimation to finish. You can come back later or refresh the project to update the current status.",
-                NotificationType.SUCCESS);
-          } catch (Exception e) {
-            Styles.notification("Estimation could not be run",
-                "Something went wrong. Please try again or contact us if the problem persists.",
-                NotificationType.ERROR);
-            Log.error(e.getMessage());
-          }
-        }
-      }
-    });
-
-
-    pilotData.addValueChangeListener(new ValueChangeListener() {
-
-      @Override
-      public void valueChange(ValueChangeEvent event) {
-        checkInputsReady();
-      }
-    });
-
-    testData.addValueChangeListener(new ValueChangeListener() {
-
-      @Override
-      public void valueChange(ValueChangeEvent event) {
-        checkInputsReady();
-      }
-    });
-
-    parameterSource.addValueChangeListener(new ValueChangeListener() {
-
-      @Override
-      public void valueChange(ValueChangeEvent event) {
-        checkInputsReady();
-      }
-    });
+    initValueChangeListeners();
   }
 
   protected void checkInputsReady() {
@@ -156,7 +78,49 @@ public class RNASeqCheckView extends ARNASeqPrepView {
     }
   }
 
+  @Override
+  public void execute() {
+    // TODO Auto-generated method stub
+    int m1 = (int) (100.0 * percDEGenesSlider.getValue());
+    int m = 10000;
+    int gcd = MathHelpers.getGCD(m1, m);
+    m = m / gcd;
+    m1 = m1 / gcd;
 
+    double avgReads = avgReadCountSlider.getValue();
+    // dispersion
+    double phi0 = dispersionSlider.getValue();
+
+    int sampleSize = getMinSampleSizeOfFactor();
+
+    if (useTestData()) {
+      try {
+        vmConnection.powerWithData(nextSampleCode, m, m1, sampleSize, getTestDataName(),
+            getDataMode());
+        Styles.notification("New power estimations started",
+            "It may take a while for power estimations on real data to finish. You can come back later or refresh the project at the top from time to time to update the current status.",
+            NotificationType.SUCCESS);
+      } catch (Exception e) {
+        Styles.notification("Estimation could not be run",
+            "Something went wrong. Please try again or contact us if the problem persists.",
+            NotificationType.ERROR);
+        Log.error(e.getMessage());
+      }
+
+    } else {
+      try {
+        vmConnection.power(nextSampleCode, m, m1, sampleSize, phi0, avgReads);
+        Styles.notification("New power estimations started",
+            "Please allow a few minutes for the power estimation to finish. You can come back later or refresh the project to update the current status.",
+            NotificationType.SUCCESS);
+      } catch (Exception e) {
+        Styles.notification("Estimation could not be run",
+            "Something went wrong. Please try again or contact us if the problem persists.",
+            NotificationType.ERROR);
+        Log.error(e.getMessage());
+      }
+    }
+  }
 
   protected int getMinSampleSizeOfFactor() {
     int n = Integer.MAX_VALUE;
@@ -245,8 +209,6 @@ public class RNASeqCheckView extends ARNASeqPrepView {
   @Override
   public List<Property> getCurrentParameters() {
     List<Property> xmlProps = super.getCurrentParameters();
-    xmlProps.add(
-        new Property("maximum_fdr", Double.toString(fdrSlider.getValue()), PropertyType.Property));
     xmlProps.add(new Property("diff_expr_genes",
         Double.toString(percDEGenesSlider.getValue()) + '%', PropertyType.Property));
     xmlProps.add(new Property("samplesize", Double.toString(getMinSampleSizeOfFactor()),
@@ -271,4 +233,40 @@ public class RNASeqCheckView extends ARNASeqPrepView {
     }
   }
 
+  private void initValueChangeListeners() {
+
+    factors.addValueChangeListener(new ValueChangeListener() {
+
+      @Override
+      public void valueChange(ValueChangeEvent event) {
+        checkInputsReady();
+      }
+    });
+
+    addComponent(button);
+
+    pilotData.addValueChangeListener(new ValueChangeListener() {
+
+      @Override
+      public void valueChange(ValueChangeEvent event) {
+        checkInputsReady();
+      }
+    });
+
+    testData.addValueChangeListener(new ValueChangeListener() {
+
+      @Override
+      public void valueChange(ValueChangeEvent event) {
+        checkInputsReady();
+      }
+    });
+
+    parameterSource.addValueChangeListener(new ValueChangeListener() {
+
+      @Override
+      public void valueChange(ValueChangeEvent event) {
+        checkInputsReady();
+      }
+    });
+  }
 }

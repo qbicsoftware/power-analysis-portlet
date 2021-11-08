@@ -49,6 +49,7 @@ import life.qbic.portal.utils.ConfigurationManager;
 import life.qbic.samplesize.model.RNACountData;
 import life.qbic.samplesize.model.SliderFactory;
 import life.qbic.samplesize.view.APowerView;
+import life.qbic.samplesize.view.ARNASeqPrepView;
 import life.qbic.samplesize.view.MicroarrayCheckView;
 import life.qbic.samplesize.view.MicroarrayEstimationView;
 import life.qbic.samplesize.view.RNASeqCheckView;
@@ -195,20 +196,20 @@ public class Controller {
     maEstView = new MicroarrayEstimationView(R, deGenes, "Microarray Sample Size Estimation",
         microArrayPowerInformation, ocPlus);
 
-
     tabs.addTab(rnaCheckView, "RNA-Seq Power");
     tabs.addTab(rnaEstView, "RNA-Seq Sample Size");
-    tabs.addTab(maEstView, "Microarray Sample Size");
-    tabs.addTab(maCheckView, "Microarray Power");
 
     tabs.getTab(rnaCheckView).setEnabled(false);
-    tabs.getTab(maCheckView).setEnabled(false);
 
     initTabButtonListener(rnaCheckView);
     initTabButtonListener(rnaEstView);
 
-    initTabButtonListener(maEstView);
-    initTabButtonListener(maCheckView);
+    tabs.getTab(maCheckView).setEnabled(false);
+    tabs.addTab(maEstView, "Microarray Sample Size");
+    tabs.addTab(maCheckView, "Microarray Power");
+
+    // initTabButtonListener(maEstView);
+    // initTabButtonListener(maCheckView);
 
     ComboBox projectBox = new ComboBox("Select a project");
     projectBox.setNullSelectionAllowed(false);
@@ -296,10 +297,13 @@ public class Controller {
       setCurrentPowerSampleCode(powerSamples);
 
       maEstView.setProjectContext(projectID, nextSampleCode);
-      rnaEstView.setProjectContext(projectID, nextSampleCode, pilotData);
       maCheckView.setProjectContext(projectID, nextSampleCode);
+
+      rnaEstView.setProjectContext(projectID, nextSampleCode, pilotData);
       rnaCheckView.setProjectContext(projectID, nextSampleCode, pilotData);
+
       enableDesignBasedViews(!sampleSizesOfFactorLevels.isEmpty());
+
       maCheckView.setDesigns(sampleSizesOfFactorLevels);
       rnaCheckView.setDesigns(sampleSizesOfFactorLevels);
     }
@@ -463,6 +467,7 @@ public class Controller {
     runTable.sort(new String[] {"Started at"}, new boolean[] {false});
 
     runTable.setPageLength(runTable.size());
+    runTable.setVisible(runTable.size() > 0);
   }
 
   private void prepareParamPopup(List<Property> props) {
@@ -538,13 +543,14 @@ public class Controller {
 
   }
 
-  private void initTabButtonListener(APowerView powerView) {
+  private void initTabButtonListener(ARNASeqPrepView powerView) {
     ClickListener listener = new Button.ClickListener() {
       @Override
       public void buttonClick(ClickEvent event) {
         incrementPowerSampleCode();
         createStatisticsSample(powerView.getCurrentParameters(), powerView.getMetadata());
         powerView.setNextSampleCode(nextSampleCode);
+        powerView.execute();
       }
     };
     powerView.getButton().addClickListener(listener);
@@ -593,6 +599,7 @@ public class Controller {
     props.put("Q_PROPERTIES", qProperties); // xml properties
     params.put("properties", props);
 
+    logger.info("creating new estimation sample: " + params);
     openbis.ingest("DSS1", "register-samp", params);
 
     addNewRunToTable(nextSampleCode, props, xmlProps);
