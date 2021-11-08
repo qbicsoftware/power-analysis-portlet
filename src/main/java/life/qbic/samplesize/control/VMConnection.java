@@ -3,7 +3,8 @@ package life.qbic.samplesize.control;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import life.qbic.samplesize.model.EstimationMode;
 
 public class VMConnection {
@@ -13,6 +14,8 @@ public class VMConnection {
   private String path;
   private String user;
 
+  private static final Logger logger = LogManager.getLogger(VMConnection.class);
+
   public VMConnection(String vm, String container, String path, String user) {
     this.vm = vm;
     this.container = container;
@@ -21,8 +24,8 @@ public class VMConnection {
   }
 
   private ArrayList<String> getMatrixCommandBase(String sampleCode) {
-    ArrayList<String> res =
-        new ArrayList<>(Arrays.asList("ssh", vm, "singularity", "run", container, user, sampleCode));
+    ArrayList<String> res = new ArrayList<>(
+        Arrays.asList("ssh", vm, "singularity", "run", container, user, sampleCode));
     return res;
   }
 
@@ -74,8 +77,8 @@ public class VMConnection {
     runCommand(cmd);
   }
 
-  public void sampleSizeWithData(String sampleCode, int genes, int deGenes, double fdr, String dataset,
-      EstimationMode mode) {
+  public void sampleSizeWithData(String sampleCode, int genes, int deGenes, double fdr,
+      String dataset, EstimationMode mode) {
     List<String> cmd = getMatrixCommandBase(sampleCode);
     cmd.add("samples");
     cmd.add(mode.toString().toLowerCase());
@@ -94,7 +97,8 @@ public class VMConnection {
    * @param mode either 'tcga' for a dataset from the cancer genome atlas, or 'data' for any other
    *        dataset
    */
-  public void powerWithData(String project, int genes, int deGenes, int sampleSize, String dataset, EstimationMode mode) {
+  public void powerWithData(String project, int genes, int deGenes, int sampleSize, String dataset,
+      EstimationMode mode) {
     List<String> cmd = getMatrixCommandBase(project);
     cmd.add("power");
     cmd.add(mode.toString().toLowerCase());
@@ -105,15 +109,14 @@ public class VMConnection {
   private void runCommand(List<String> cmd) {
     ProcessBuilderWrapper pbd = null;
     try {
-      System.out.println("sending: " + cmd);
+      logger.info("starting estimation run: " + cmd);
       pbd = new ProcessBuilderWrapper(cmd, false);
     } catch (Exception e) {
       e.printStackTrace();
     }
     if (pbd.getStatus() != 0) {
-      System.out.println("Command has terminated with status: " + pbd.getStatus());
-      System.out.println("Error: " + pbd.getErrors());
-      System.out.println("Last command sent: " + cmd);
+      logger.error("Command has terminated with status: " + pbd.getStatus());
+      logger.error("Error: " + pbd.getErrors());
     }
   }
 
