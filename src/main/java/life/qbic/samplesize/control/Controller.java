@@ -204,9 +204,9 @@ public class Controller {
     initTabButtonListener(rnaCheckView);
     initTabButtonListener(rnaEstView);
 
+    tabs.addTab(maCheckView, "Microarray Power");
     tabs.getTab(maCheckView).setEnabled(false);
     tabs.addTab(maEstView, "Microarray Sample Size");
-    tabs.addTab(maCheckView, "Microarray Power");
 
     // initTabButtonListener(maEstView);
     // initTabButtonListener(maCheckView);
@@ -223,7 +223,6 @@ public class Controller {
       public void valueChange(ValueChangeEvent event) {
         loadProject(projectBox);
       }
-
     });
 
     runTable = new Table("Existing Calculations");
