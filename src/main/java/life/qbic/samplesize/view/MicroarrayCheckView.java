@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import com.vaadin.data.Property.ValueChangeEvent;
 import com.vaadin.data.Property.ValueChangeListener;
@@ -33,7 +34,8 @@ public class MicroarrayCheckView extends AHeatMapPrepView {
   private Map<String, Map<String, Set<String>>> sampleSizesOfFactorLevels;
   private Map<String, Set<String>> selectedLevels;
 
-  public MicroarrayCheckView(RController R, SliderFactory sensitivity, String title, String infoText, String link) {
+  public MicroarrayCheckView(RController R, SliderFactory sensitivity, String title,
+      String infoText, String link) {
     super(R, title, infoText, link);
     prepareRCode(R);
 
@@ -68,8 +70,18 @@ public class MicroarrayCheckView extends AHeatMapPrepView {
               selectLevelsPopup(factor, levels);
               break;
             default:
-              selectedLevels = levels;
-              button.setEnabled(true);
+              boolean replicates = true;
+              for (Set<String> levelMembers : levels.values()) {
+                if (levelMembers.size() < 2) {
+                  replicates &= false;
+                }
+              }
+              if (replicates) {
+                selectedLevels = levels;
+                button.setEnabled(true);
+              } else {
+                selectLevelsPopup(factor, levels);
+              }
               break;
           }
         } else {
@@ -117,11 +129,19 @@ public class MicroarrayCheckView extends AHeatMapPrepView {
     subContent.setSpacing(true);
     subContent.setMargin(true);
     subWindow.setContent(subContent);
-    OptionGroup levelGroup = new OptionGroup("Select two levels of factor " + factor);
+    Label info = new Label("Select two levels of factor " + factor
+        + ". Each level needs at least one replicate (2 samples).");
+    subContent.addComponent(info);
+    OptionGroup levelGroup = new OptionGroup();
     levelGroup.setMultiSelect(true);
 
     for (String level : levels.keySet()) {
-      levelGroup.addItem(level);
+      int size = levels.get(level).size();
+      Object item = level + " (" + size + ")";
+      levelGroup.addItem(item);
+      if (size < 2) {
+        levelGroup.setItemEnabled(item, false);
+      }
     }
 
     Button close = new Button("Ok");
@@ -134,8 +154,12 @@ public class MicroarrayCheckView extends AHeatMapPrepView {
           Set<String> values = (Set<String>) levelGroup.getValue();
           close.setEnabled(values.size() == 2);
           if (values.size() < 2) {
-            for (Object id : levelGroup.getItemIds()) {
-              levelGroup.setItemEnabled(id, true);
+            for (Object displayName : levelGroup.getItemIds()) {
+              String label = levelLabelToName((String) displayName);
+              int levelSize = levels.get(label).size();
+              if (levelSize > 1) {
+                levelGroup.setItemEnabled(displayName, true);
+              }
             }
           } else {
             for (Object id : levelGroup.getItemIds()) {
@@ -155,8 +179,9 @@ public class MicroarrayCheckView extends AHeatMapPrepView {
         selectedLevels = new HashMap<>();
 
         Set<String> values = (Set<String>) levelGroup.getValue();
-        for (String val : values) {
-          selectedLevels.put(val, levels.get(val));
+        for (String displayName : values) {
+          String label = levelLabelToName(displayName);
+          selectedLevels.put(label, levels.get(label));
         }
         subWindow.close();
         button.setEnabled(true);
@@ -169,6 +194,10 @@ public class MicroarrayCheckView extends AHeatMapPrepView {
     subWindow.center();
     // Open it in the UI
     UI.getCurrent().addWindow(subWindow);
+  }
+
+  private String levelLabelToName(String label) {
+    return label.split(" \\(")[0];
   }
 
   @Override
@@ -204,7 +233,7 @@ public class MicroarrayCheckView extends AHeatMapPrepView {
             + "mat <- matrix(mat, ncol = length(D));" + "colnames(mat) <- D;"
             + "row.names(mat) <- p0;" + "return(mat) }");
   }
-  
+
   public void setDesigns(Map<String, Map<String, Set<String>>> sampleSizesOfFactorLevels) {
     this.sampleSizesOfFactorLevels = sampleSizesOfFactorLevels;
     factors.removeAllItems();
