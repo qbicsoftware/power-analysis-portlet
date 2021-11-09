@@ -9,14 +9,14 @@
 		<version>3.1.4</version>
 	</parent>
 	<properties>
-		<vaadin.version>7.7.17</vaadin.version>
-		<vaadin.plugin.version>7.7.17</vaadin.plugin.version>
+		<vaadin.version>7.7.28</vaadin.version>
+		<vaadin.plugin.version>7.7.28</vaadin.plugin.version>
 	</properties>
 	<artifactId>samplesize-portlet</artifactId>
 	<version>0.10.0-SNAPSHOT</version>
 	<name>Sample Size Estimation Portlet</name>
-	<url>http://github.com/qbicsoftware/samplesize-portlet</url>
-	<description>sample size estimation for differential abundance analysis</description>
+	<url>https://github.com/qbicsoftware/power-analysis-portlet</url>
+	<description>Power and sample size estimation for differential abundance analysis in transcriptomics</description>
 	<packaging>war</packaging>
 
 	<repositories>
@@ -104,8 +104,5 @@
 			<artifactId>openbis-client-lib</artifactId>
 			<version>1.6.0-SNAPSHOT</version>
 		</dependency>
-
-
-
 	</dependencies>
 </project>
