@@ -6,7 +6,6 @@ import com.vaadin.server.VaadinRequest;
 import com.vaadin.ui.Label;
 import com.vaadin.ui.Layout;
 import com.vaadin.ui.VerticalLayout;
-
 import life.qbic.openbis.openbisclient.OpenBisClient;
 import life.qbic.portal.utils.ConfigurationManager;
 import life.qbic.portal.utils.ConfigurationManagerFactory;
@@ -31,7 +30,6 @@ public class SamplesizePortlet extends QBiCPortletUI {
   @Override
   protected Layout getPortletContent(final VaadinRequest request) {
     logger.info("Generating content for {}", SamplesizePortlet.class);
-
     ConfigurationManager config = ConfigurationManagerFactory.getInstance();
     VerticalLayout layout = new VerticalLayout();
 
@@ -50,21 +48,26 @@ public class SamplesizePortlet extends QBiCPortletUI {
           new OpenBisClient(config.getDataSourceUser(), config.getDataSourcePassword(), apiURL);
       openbis.login();
     } catch (Exception e) {
-      System.out.println(e.getMessage());
-      System.out.println(e.getCause());
+      logger.error(e.getMessage());
+      logger.error(e.getCause());
       success = false;
-      logger.error("User \"" + user
-          + "\" could not connect to openBIS and has been informed of this.");
+      logger.error(
+          "User \"" + user + "\" could not connect to openBIS and has been informed of this.");
       layout.addComponent(new Label(
           "Data Management System could not be reached. Please try again later or contact us."));
     }
 
     if (success) {
-      new Controller(openbis, layout, config, user);
+      try {
+        new Controller(openbis, layout, config, user);
+      } catch (Exception e) {
+        logger.error("Problem setting up view:");
+        logger.error(e.toString());
+      }
     }
     layout.setSpacing(true);
     layout.setMargin(true);
-    
+
     return layout;
   }
 }
